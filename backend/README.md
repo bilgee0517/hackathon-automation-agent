@@ -10,6 +10,7 @@ AI-powered backend service that analyzes hackathon project repositories to detec
 - 📊 **Structured Results**: Saves analysis to Sanity CMS
 - 💾 **S3 Storage**: Optionally stores repo snapshots in AWS S3
 - 🎯 **Smart Scoring**: 0-10 integration depth scores with evidence
+- 🔭 **Agent Observatory**: Real-time visualization of agent behavior with detailed logging
 
 ## Architecture
 
@@ -119,6 +120,26 @@ Submit a repository for analysis.
   "status": "pending",
   "message": "Analysis job created successfully"
 }
+```
+
+### GET /api/watch/:jobId
+
+**🆕 NEW: Agent Observatory** - Watch the AI agent work in real-time!
+
+Open this URL in your browser to see:
+- Visual flow diagram of agent decisions
+- Real-time tool calls and results
+- Complete logs with full inputs/outputs
+- API usage statistics
+- Timeline with expandable details
+
+Example: `http://localhost:3001/api/watch/abc-123-def`
+
+See [AGENT_LOGGING.md](./AGENT_LOGGING.md) for full documentation.
+
+**Quick Demo:**
+```bash
+./scripts/demo-logging.sh
 ```
 
 ### GET /api/status/:jobId

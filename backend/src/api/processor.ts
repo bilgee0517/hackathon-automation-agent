@@ -12,7 +12,7 @@ import { runAgentAnalysis } from '../agent/orchestrator';
  * Process a single analysis job
  */
 async function processAnalysisJob(job: Job<QueueJob>): Promise<AnalysisResult> {
-  const { jobId, githubUrl, teamName, projectName, branch } = job.data;
+  const { jobId, githubUrl, teamName, projectName, branch, teamMembers } = job.data;
   
   console.log(`\n========================================`);
   console.log(`Processing job ${jobId}`);
@@ -75,7 +75,8 @@ async function processAnalysisJob(job: Job<QueueJob>): Promise<AnalysisResult> {
       (progress) => {
         console.log(`  Agent: ${progress}`);
         updateJobStatus(jobId, 'analyzing', progress).catch(console.error);
-      }
+      },
+      jobId  // Pass jobId for agent observatory
     );
     
     // Update with basic stats
@@ -94,7 +95,7 @@ async function processAnalysisJob(job: Job<QueueJob>): Promise<AnalysisResult> {
       if (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) {
         await updateJobStatus(jobId, 'analyzing', 'Saving results to Sanity...');
         console.log('Step 5: Saving results to Sanity...');
-        const sanityId = await saveSponsorAnalysis(analysis);
+        const sanityId = await saveSponsorAnalysis(analysis, teamMembers);
         console.log(`✓ Saved to Sanity: ${sanityId}`);
       } else {
         console.log('Step 5: Skipping Sanity save (not configured)');

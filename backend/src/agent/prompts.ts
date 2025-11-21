@@ -111,6 +111,24 @@ You'll need to rely on code patterns and common knowledge about sponsors.
 
 ## Sponsor Context
 Here's what each sponsor offers (use your knowledge${hasWebSearch ? ' and web search' : ''} to detect their usage):
+- **LiquidMetal AI**: AI platform and model deployment
+- **Fastino Labs**: Development tools and accelerator platform
+- **Freepik**: Image generation, graphic design, and creative assets API
+- **Gladly**: Customer service and support platform
+- **Frontegg**: Authentication, user management, and identity platform
+- **Google DeepMind**: Gemini AI models, generative AI, PaLM, Bard
+- **Forethought**: AI-powered customer support automation
+- **Lovable**: AI development platform and code generation
+- **Airia**: AI platform and enterprise AI solutions
+- **Campfire**: Team collaboration and communication platform
+- **Linkup**: Web search API and information retrieval
+- **Daft**: Distributed dataframes and data processing
+- **Senso**: Data platform and analytics
+- **Crosby**: AI platform and intelligent systems
+- **MCP Total**: Model Context Protocol SDK and tooling
+
+// ===== OLD SPONSORS (COMMENTED OUT) =====
+/*
 - **AWS**: Amazon Web Services (S3, Lambda, DynamoDB, EC2, CloudFormation, etc.)
 - **Skyflow**: Data privacy vault for PII protection and tokenization
 - **Postman**: API testing and development tools (Newman, collections)
@@ -126,14 +144,25 @@ Here's what each sponsor offers (use your knowledge${hasWebSearch ? ' and web se
 - **Lightning AI**: ML/AI platform for training and deployment (PyTorch Lightning)
 - **Parallel**: DeFi protocol on Polkadot
 - **Cleric**: Workflow automation platform
+*/
 
 ## Your Approach
 Use your intelligence and the available tools to:
 1. Explore the codebase structure and understand what it does
 2. Look for dependencies, imports, and configuration related to these technologies
 3. Find actual usage in the code (API calls, SDK usage, etc.)
-4. Evaluate how deeply each technology is integrated
-5. Be creative - integrations might not use official SDKs (e.g., direct API calls, Docker images, etc.)
+4. **READ IMPLEMENTATION FILES THOROUGHLY** - use read_file on key files to understand HOW things work
+5. Evaluate how deeply each technology is integrated
+6. **EXTRACT SUBSTANTIAL CODE SNIPPETS** - capture 5-20 line blocks showing actual implementation
+7. Be creative - integrations might not use official SDKs (e.g., direct API calls, Docker images, etc.)
+
+## Critical: Read Files, Don't Just Search
+- **Don't rely only on search_code** - it shows you WHERE but not HOW
+- **Use read_file extensively** - read the actual implementation files
+- When you find a sponsor integration, read the ENTIRE file to understand usage depth
+- Look for: initialization, configuration, error handling, data flow, business logic
+- Extract meaningful code blocks (not just single-line imports)
+- Understand the architecture and how the sponsor tech fits in
 
 ## Detection Strategy
 For each sponsor, consider:
@@ -153,12 +182,68 @@ Be honest and fair in your assessment:
 - **7-8**: Moderate integration with multiple features used properly
 - **9-10**: Deep integration - central to the app, creative usage, well-tested, core feature
 
+## 📊 ANALYSIS DEPTH REQUIREMENTS
+
+You MUST provide COMPREHENSIVE, DETAILED analysis for each sponsor:
+
+### For technicalSummary (3-5 paragraphs minimum):
+- **Paragraph 1**: What specific APIs/SDKs/services are being used (be specific with function names, endpoints, methods)
+- **Paragraph 2**: HOW the integration works technically (initialization, authentication, data flow)
+- **Paragraph 3**: WHAT features of the sponsor tech are being utilized (list specific capabilities)
+- **Paragraph 4**: WHERE in the codebase it's integrated (architecture, file organization)
+- **Paragraph 5**: Any notable implementation details (error handling, configurations, advanced usage)
+
+### For plainEnglishSummary (2-3 paragraphs minimum):
+- **Paragraph 1**: What the sponsor technology does in simple terms
+- **Paragraph 2**: How this project uses it and why (the business/user value)
+- **Paragraph 3**: The impact on the end-user experience
+
+### For evidence.codeSnippets (5-10+ snippets for detected sponsors):
+You MUST include EXTENSIVE code snippets showing:
+1. **Dependency/Import statements** (from package.json, requirements.txt, imports)
+2. **Initialization/Configuration code** (how the SDK/API is set up)
+3. **Core usage examples** (actual API calls, method invocations)
+4. **Data processing** (how data flows through the sponsor tech)
+5. **Error handling** (try/catch, error cases)
+6. **Advanced features** (if any complex usage exists)
+7. **Multiple usage sites** (show 3-5+ different places it's used)
+
+Each code snippet should be:
+- **Complete enough to understand context** (not just single lines)
+- **Include file paths** (e.g., "From src/api/claude.ts, lines 45-67:")
+- **Show meaningful code blocks** (5-20 lines each, showing actual implementation)
+- **Demonstrate actual functionality** (not just imports)
+
+### For evidence.keyFindings (5-10+ findings for detected sponsors):
+Include specific, actionable findings:
+- Exact API endpoints/methods called (e.g., "Uses Anthropic's messages.create with claude-3-5-sonnet model")
+- Configuration details (e.g., "Max tokens set to 4096, temperature 0.7")
+- Data patterns (e.g., "Processes 50+ customer queries per session")
+- Integration patterns (e.g., "Implements retry logic with exponential backoff")
+- Performance considerations (e.g., "Caches responses for 5 minutes")
+- Security measures (e.g., "API keys stored in environment variables")
+- Usage statistics if found in code (e.g., "Configured for 100 requests/minute")
+
+### For overallSummary (4-6 paragraphs minimum):
+Provide a comprehensive project overview:
+- **Paragraph 1**: What the project does (purpose, target users, key features)
+- **Paragraph 2**: Technical architecture and tech stack
+- **Paragraph 3**: Which sponsors are integrated and at what depth
+- **Paragraph 4**: Most impressive/creative sponsor integrations
+- **Paragraph 5**: Overall integration quality and implementation patterns
+- **Paragraph 6**: Potential for prize eligibility and standout aspects
+
 ## Key Principles
 - **Evidence-based**: Base scores on actual code, not assumptions
 - **Be thorough**: Check multiple places (deps, imports, configs, code)
 - **Be fair**: Don't over-credit just for having a dependency installed
 - **Be creative**: Some integrations might be indirect (e.g., using AWS via Terraform)
 - **Context matters**: Understand what the app does to evaluate relevance
+- **DEPTH IS CRITICAL**: Provide comprehensive analysis with extensive code snippets
+- **SHOW YOUR WORK**: Include 5-10+ code snippets for any detected integration
+- **BE SPECIFIC**: Name exact functions, methods, endpoints, not just "uses X API"
+- **READ THE CODE**: Don't just grep for keywords - read actual implementation files
+- **EXPLAIN HOW IT WORKS**: Technical summaries should be 3-5 paragraphs showing deep understanding
 
 ## Output Requirements
 Return a JSON object with this EXACT structure:
@@ -172,25 +257,51 @@ Return a JSON object with this EXACT structure:
     "dependencies": ["list", "of", "key", "dependencies"]
   },
   "sponsors": {
-    "aws": {
+    "liquidMetalAI": {
       "detected": boolean,
       "integrationScore": number (0-10),
-      "technicalSummary": "Detailed technical description of how AWS is used",
-      "plainEnglishSummary": "Simple explanation for non-technical readers",
+      "technicalSummary": "COMPREHENSIVE 3-5 paragraph technical analysis covering: (1) What specific APIs/methods/endpoints are used with exact names, (2) HOW the integration works (init, auth, data flow), (3) WHAT features are utilized, (4) WHERE in codebase it's integrated, (5) Notable implementation details. BE SPECIFIC WITH FUNCTION/METHOD NAMES.",
+      "plainEnglishSummary": "DETAILED 2-3 paragraph explanation in simple terms covering: (1) What the technology does, (2) How this project uses it and why, (3) Impact on end-users. Make it understandable to non-developers.",
       "evidence": {
-        "files": ["list", "of", "relevant", "files"],
-        "codeSnippets": ["key code examples"],
-        "keyFindings": ["specific observations"]
+        "files": ["list", "of", "relevant", "files", "with", "paths"],
+        "codeSnippets": [
+          "MINIMUM 5-10 SUBSTANTIAL CODE SNIPPETS for detected sponsors (more is better!). Each snippet must be:",
+          "1. From package.json/requirements.txt showing dependency",
+          "2. Import/require statements from actual source files", 
+          "3. Initialization/configuration code (5-15 lines showing setup)",
+          "4. Core usage examples (10-20 lines showing actual API calls)",
+          "5. Data processing/transformation code",
+          "6. Error handling implementation",
+          "7-10. Additional usage sites showing integration breadth",
+          "",
+          "Format: 'From path/to/file.js, lines 45-67:\n<actual code block>'",
+          "Include file paths, line numbers, and meaningful code blocks (not just single lines)",
+          "Show REAL implementation details, not summaries"
+        ],
+        "keyFindings": [
+          "MINIMUM 5-10 SPECIFIC, DETAILED FINDINGS for detected sponsors:",
+          "- Exact API methods called (e.g., 'Uses anthropic.messages.create() with claude-3-5-sonnet-20241022 model')",
+          "- Configuration values (e.g., 'Max tokens: 4096, temperature: 0.7, streaming enabled')",
+          "- Data flow patterns (e.g., 'Processes user messages through context builder before Claude API call')",
+          "- Integration architecture (e.g., 'Implements service layer pattern in src/services/ai/claude-service.ts')",
+          "- Performance details (e.g., 'Response caching with 5-minute TTL in Redis')",
+          "- Security measures (e.g., 'API key managed via AWS Secrets Manager, rotated weekly')",
+          "- Usage statistics from code (e.g., 'Rate limited to 100 requests/minute per user')",
+          "- Advanced features (e.g., 'Uses function calling with 5 custom tools for data retrieval')",
+          "- Error handling (e.g., 'Retry logic with exponential backoff (3 attempts, max 30s delay)')",
+          "- Business logic integration (e.g., 'Claude generates product descriptions which are cached in PostgreSQL')"
+        ]
       },
       "prizeEligible": boolean,
       "confidence": number (0-1),
       "suggestions": ["how to improve the integration"]
     },
-    // ... repeat for all sponsors: skyflow, postman, redis, forethought, finsterAI, senso, 
-    // anthropic, sanity, trmLabs, coder, lightpanda, lightningAI, parallel, cleric
+    // ... repeat for all sponsors: fastinoLabs, freepik, gladly, frontegg, 
+    // googleDeepMind, forethought, lovable, airia, campfire, linkup, daft, 
+    // senso, crosby, mcpTotal
   },
-  "overallSummary": "Brief overview of the project and its sponsor integrations",
-  "innovativeAspects": ["unique", "or", "creative", "uses"]
+  "overallSummary": "COMPREHENSIVE 4-6 PARAGRAPH PROJECT OVERVIEW covering: (1) Project purpose, target users, and key features, (2) Technical architecture and tech stack overview, (3) Summary of which sponsors are integrated and at what depth (with scores), (4) Most impressive or creative sponsor integrations with specific examples, (5) Overall code quality and integration patterns observed, (6) Prize eligibility assessment and standout aspects. This should read like an executive summary that thoroughly describes the entire project and its sponsor integrations.",
+  "innovativeAspects": ["unique", "or", "creative", "uses", "with", "specific", "details", "not", "generic", "statements"]
 }
 
 ## Important Rules
@@ -198,10 +309,16 @@ Return a JSON object with this EXACT structure:
 - **Start with recall_learnings()** to see what you've learned from past analyses
 - Base scores on ACTUAL usage, not just dependencies
 - Be honest - if something isn't integrated, say so (score 0)
-- Provide specific evidence from the code
-- Plain English summaries should be understandable to non-developers
+- **Provide EXTENSIVE evidence from the code** - 5-10+ code snippets per detected sponsor
+- **Read actual implementation files** - don't just search for keywords
+- Plain English summaries should be 2-3 paragraphs, understandable to non-developers
+- Technical summaries should be 3-5 paragraphs with specific function/method names
+- Overall summary should be 4-6 paragraphs covering the entire project comprehensively
 - Be fair and consistent in your scoring
 - Use your knowledge of these technologies to find creative integrations
+- **SHOW HOW things work**, not just WHERE they are
+- Include actual code blocks (5-20 lines each) showing real implementation
+- Name specific APIs, endpoints, methods, functions - be precise!
 
 ## CRITICAL: Final Response Format
 When you're done analyzing, respond with ONLY the JSON object. No explanations before or after.

@@ -1,6 +1,6 @@
-# Devpost Project Scraper
+# Devpost Project Scraper & Sanity Integration
 
-Scrapes all projects from the Self-Evolving Agents Hack hackathon on Devpost.
+Scrapes projects from Devpost hackathons and optionally imports them to Sanity with AI analysis.
 
 ## Installation
 
@@ -8,7 +8,37 @@ Scrapes all projects from the Self-Evolving Agents Hack hackathon on Devpost.
 npm install
 ```
 
-## Usage
+## 🆕 NEW: Import to Sanity with AI Analysis
+
+**Automatically import entire hackathons into Sanity with enriched AI analysis!**
+
+### Quick Start
+
+```bash
+# 1. Setup environment (copy from backend)
+cp ../backend/.env .env
+
+# 2. Start backend
+cd ../backend && npm run dev
+
+# 3. Run import
+cd ../scraper
+npm run import https://your-hackathon.devpost.com
+```
+
+### What It Does
+
+✅ Scrapes all projects from Devpost gallery  
+✅ Extracts team members, awards, technologies  
+✅ Sends GitHub URLs to backend for AI analysis  
+✅ Detects sponsor integrations automatically  
+✅ Combines everything into enriched Sanity documents  
+
+📚 **Full documentation: [DEVPOST_INTEGRATION_COMPLETE.md](./DEVPOST_INTEGRATION_COMPLETE.md)**
+
+---
+
+## Original Scraper (JSON Export Only)
 
 ### Test the scraper on a single project:
 ```bash

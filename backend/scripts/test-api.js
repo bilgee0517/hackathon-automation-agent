@@ -65,7 +65,21 @@ async function runTest() {
       body: {
         githubUrl: GITHUB_URL,
         teamName: 'Test Team',
-        projectName: 'Test Project'
+        projectName: 'Test Project',
+        teamMembers: [
+          {
+            name: 'Alice Johnson',
+            email: 'alice@example.com',
+            githubUsername: 'alicejohnson',
+            bio: 'Full-stack developer specializing in AI integrations'
+          },
+          {
+            name: 'Bob Smith',
+            email: 'bob@example.com',
+            githubUsername: 'bobsmith',
+            bio: 'Backend engineer and DevOps specialist'
+          }
+        ]
       }
     });
     

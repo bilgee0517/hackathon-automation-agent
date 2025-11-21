@@ -6,19 +6,23 @@
   "type": "module",
   "scripts": {
     "scrape": "node scraper.js",
-    "test": "node test-single.js"
+    "test": "node test-single.js",
+    "import": "node devpost-to-sanity.js",
+    "test-import": "node test-import.js"
   },
   "keywords": [
     "scraper",
     "devpost",
-    "hackathon"
+    "hackathon",
+    "sanity"
   ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "node-fetch": "^3.3.2",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "@sanity/client": "^7.13.0"
   }
 }
 

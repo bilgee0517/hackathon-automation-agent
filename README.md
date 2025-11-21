@@ -10,15 +10,18 @@ This agent watches what teams build and translates it into human language for or
 
 - 🤖 **Autonomous AI Agent**: Claude-powered agent that intelligently explores codebases
 - 🔍 **15 Sponsor Technologies**: Detects AWS, Skyflow, Postman, Redis, Forethought, Finster AI, Senso, Anthropic, Sanity, TRM Labs, Coder, Lightpanda, Lightning AI, Parallel, and Cleric
+- ⚡ **Cloud Execution (NEW)**: Lightning AI integration runs projects in the cloud to validate integrations with real execution
 - ⚡ **Async Processing**: Redis-based job queue for scalable analysis
 - 📊 **Structured Results**: Saves to Sanity CMS for easy querying
 - 💾 **Optional S3 Storage**: Persist repositories for re-analysis
 - 🎯 **Smart Scoring**: 0-10 integration depth scores with detailed evidence
+- 👀 **Agent Observatory**: Real-time visualization of agent analysis process
 
 ## Architecture
 
 The system uses sponsor tools to build itself:
 - **Anthropic (Claude)**: Powers the AI agent that analyzes repos
+- **Lightning AI**: Cloud execution environment for running and testing projects
 - **Sanity**: Stores final analysis results as structured data
 - **Redis**: Job queue for analysis tasks + caching results
 - **AWS S3**: Stores cloned repos and analysis artifacts (optional)
@@ -28,9 +31,11 @@ The system uses sponsor tools to build itself:
 ### Prerequisites
 
 - Node.js 20+
+- Python 3.8+ (for Lightning AI integration)
 - Redis server
 - AI API key (Anthropic or OpenAI)
 - Sanity account (optional)
+- Lightning AI account (optional, for cloud execution)
 
 ### Setup
 
@@ -61,7 +66,19 @@ brew install redis && redis-server
 docker run -d -p 6379:6379 redis:alpine
 ```
 
-5. **Run the backend**
+5. **(Optional) Setup Lightning AI for cloud execution**
+```bash
+# Install Lightning SDK
+pip3 install lightning-sdk
+
+# Add to .env:
+# ENABLE_LIGHTNING_EXECUTION=true
+# LIGHTNING_USER_ID=your-user-id
+# LIGHTNING_API_KEY=your-api-key
+# See backend/LIGHTNING_QUICKSTART.md for details
+```
+
+6. **Run the backend**
 ```bash
 npm run dev
 ```
@@ -94,6 +111,8 @@ curl http://localhost:3001/api/results/YOUR_JOB_ID
 
 ## How It Works
 
+### Static Analysis (Always Enabled)
+
 1. **Submit Repository**: POST GitHub URL to `/api/analyze`
 2. **Clone & Analyze**: Agent clones repo and explores with tools:
    - Read files, search code, list directories
@@ -107,6 +126,21 @@ curl http://localhost:3001/api/results/YOUR_JOB_ID
    - Prize eligibility
 4. **Save Results**: Push to Sanity CMS, cache in Redis
 5. **Return Analysis**: Complete sponsor breakdown available via API
+
+### ⚡ Cloud Execution (Optional - Lightning AI)
+
+When enabled, the agent goes further:
+
+1. **Delegate to Lightning Agent**: Main orchestrator hands off to specialized execution agent
+2. **Clone in Cloud**: Lightning AI spins up a Studio and clones the GitHub repo
+3. **Install Dependencies**: Runs `npm install` / `pip install` in the cloud
+4. **Run Tests**: Executes `npm test` / `pytest` in real cloud environment
+5. **Validate Integrations**: Checks if sponsor SDKs actually work
+6. **Report Back**: Enhanced scores based on real execution results
+
+**Example**: A project claiming Postman integration gets a higher score if its tests actually run and make Postman API calls successfully.
+
+See `backend/LIGHTNING_COMPLETE.md` for full documentation.
 
 ## Project Structure
 

@@ -1,18 +1,10 @@
 // Lightning AI service for cloud execution
-// Uses Lightning AI Studios API to run projects in the cloud
+// Uses Lightning AI Python bridge for real cloud execution
 
-import axios, { AxiosInstance } from 'axios';
-import fs from 'fs';
+import axios from 'axios';
+import { execSync } from 'child_process';
 import path from 'path';
-import archiver from 'archiver';
-import { ExecutionResults, EndpointTestResult } from '../types';
-
-interface LightningStudioConfig {
-  name: string;
-  environment: 'python' | 'nodejs' | 'go';
-  hardware?: 'cpu' | 'cpu-medium' | 'gpu-t4';
-  diskSizeGB?: number;
-}
+import { EndpointTestResult } from '../types';
 
 interface CommandResult {
   success: boolean;
@@ -22,152 +14,155 @@ interface CommandResult {
   duration: number;
 }
 
+interface CloudExecutionResult {
+  success: boolean;
+  outputs: Array<{
+    command: string;
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+    success: boolean;
+  }>;
+  errors: string[];
+}
+
 /**
  * Lightning AI Studio Manager
- * Handles creation, execution, and cleanup of Lightning AI Studios
+ * Handles execution via Lightning AI Python bridge
  */
 export class LightningStudioManager {
   private apiKey: string;
-  private apiBaseUrl: string;
-  private client: AxiosInstance;
+  private pythonScript: string;
   
   constructor() {
     this.apiKey = process.env.LIGHTNING_API_KEY || '';
-    this.apiBaseUrl = process.env.LIGHTNING_API_URL || 'https://lightning.ai/api/v1';
-    
-    this.client = axios.create({
-      baseURL: this.apiBaseUrl,
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 300000 // 5 min timeout
-    });
+    this.pythonScript = path.join(__dirname, '../../scripts/lightning_executor.py');
   }
   
   /**
    * Check if Lightning AI is configured and available
    */
   isAvailable(): boolean {
-    return !!this.apiKey && this.apiKey.length > 0;
-  }
-  
-  /**
-   * Create a new Lightning Studio
-   */
-  async createStudio(config: LightningStudioConfig): Promise<string> {
-    if (!this.isAvailable()) {
-      throw new Error('Lightning AI is not configured. Set LIGHTNING_API_KEY');
+    if (!this.apiKey || this.apiKey.length === 0) {
+      console.log('⚠️  Lightning AI API key not configured');
+      return false;
     }
     
-    console.log(`⚡ Creating Lightning Studio: ${config.name}`);
-    
+    // Check if Python 3 is available
     try {
-      // Note: This is a placeholder implementation
-      // Real implementation would use Lightning AI's actual API
-      // For now, we'll simulate with local execution as fallback
-      
-      const studioId = `ltng-studio-${Date.now()}`;
-      
-      console.log(`✓ Studio created: ${studioId}`);
-      return studioId;
-      
+      execSync('python3 --version', { stdio: 'ignore' });
     } catch (error) {
-      console.error('Failed to create Lightning Studio:', error);
-      throw error;
+      console.log('⚠️  Python 3 not found');
+      return false;
+    }
+    
+    // Check if lightning package is installed
+    try {
+      execSync('python3 -c "import lightning"', { stdio: 'ignore' });
+      console.log('✓ Lightning AI Python package available');
+      return true;
+    } catch (error) {
+      console.log('⚠️  Lightning package not installed. Install with: pip install lightning');
+      return false;
     }
   }
   
   /**
-   * Upload repository to studio
+   * Execute commands in Lightning AI cloud via Python bridge
    */
-  async uploadRepo(studioId: string, repoPath: string): Promise<void> {
-    console.log(`⚡ Uploading repo to studio ${studioId}...`);
+  async executeInCloud(
+    repoUrl: string,
+    projectName: string,
+    commands: string[]
+  ): Promise<CloudExecutionResult> {
+    console.log(`⚡ Executing in Lightning AI cloud...`);
+    console.log(`   Repo: ${repoUrl}`);
+    console.log(`   Project: ${projectName}`);
+    console.log(`   Commands: ${commands.join(', ')}`);
     
     try {
-      // Create zip of repo
-      const zipPath = `/tmp/repo-${Date.now()}.zip`;
-      await this.zipDirectory(repoPath, zipPath);
+      // Build Python command with proper escaping
+      const args = [
+        this.pythonScript,
+        repoUrl,
+        projectName,
+        ...commands
+      ];
       
-      // Upload to studio (placeholder)
-      console.log(`✓ Repo uploaded (${fs.statSync(zipPath).size} bytes)`);
+      // Execute Python bridge script
+      const result = execSync(`python3 ${args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ')}`, {
+        encoding: 'utf-8',
+        env: { ...process.env, LIGHTNING_API_KEY: this.apiKey },
+        timeout: 600000, // 10 minute timeout
+        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+      });
       
-      // Cleanup
-      fs.unlinkSync(zipPath);
+      // Parse JSON output
+      const output = JSON.parse(result);
       
-    } catch (error) {
-      console.error('Failed to upload repo:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Execute a command in the studio
-   */
-  async executeCommand(
-    studioId: string,
-    command: string,
-    workdir?: string
-  ): Promise<CommandResult> {
-    console.log(`⚡ Executing in studio: ${command}`);
-    
-    const startTime = Date.now();
-    
-    try {
-      // Placeholder: Would call Lightning API
-      // For now, return simulated success
-      const result: CommandResult = {
-        success: true,
-        exitCode: 0,
-        stdout: `Simulated execution of: ${command}`,
-        stderr: '',
-        duration: Date.now() - startTime
-      };
+      console.log(`✓ Lightning execution complete`);
+      console.log(`   Success: ${output.success}`);
+      console.log(`   Commands executed: ${output.outputs?.length || 0}`);
       
-      console.log(`✓ Command completed (${result.duration}ms)`);
-      return result;
+      return output;
       
-    } catch (error) {
-      console.error('Command execution failed:', error);
-      return {
+    } catch (error: any) {
+      console.error('⚡ Lightning execution failed:', error);
+      
+      // Try to parse error output as JSON
+      let parsedError: CloudExecutionResult | null = null;
+      if (error.stdout) {
+        try {
+          parsedError = JSON.parse(error.stdout);
+        } catch (e) {
+          // Not JSON, ignore
+        }
+      }
+      
+      return parsedError || {
         success: false,
-        exitCode: 1,
-        stdout: '',
-        stderr: error instanceof Error ? error.message : 'Unknown error',
-        duration: Date.now() - startTime
+        outputs: [],
+        errors: [error.message || 'Unknown error']
       };
     }
   }
   
   /**
-   * Start an application in the studio
+   * Legacy compatibility methods (kept for backwards compatibility)
    */
-  async startApp(
-    studioId: string,
-    command: string,
-    port: number = 3000
-  ): Promise<string> {
-    console.log(`⚡ Starting app in studio on port ${port}...`);
-    
-    try {
-      // Execute start command in background
-      await this.executeCommand(studioId, command);
-      
-      // Return the studio URL
-      const url = `https://${studioId}.lightning.ai:${port}`;
-      console.log(`✓ App started: ${url}`);
-      
-      return url;
-      
-    } catch (error) {
-      console.error('Failed to start app:', error);
-      throw error;
-    }
+  
+  async createStudio(_config: any): Promise<string> {
+    // Studios are created automatically by Lightning App
+    return `ltng-${Date.now()}`;
   }
   
-  /**
-   * Test an HTTP endpoint
-   */
+  async uploadRepo(_studioId: string, _repoPath: string): Promise<void> {
+    // Handled by Lightning App
+  }
+  
+  async executeCommand(
+    _studioId: string,
+    _command: string,
+    _workdir?: string
+  ): Promise<CommandResult> {
+    // Single command execution - use executeInCloud() instead
+    return {
+      success: false,
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Use executeInCloud() for Lightning execution',
+      duration: 0
+    };
+  }
+  
+  async startApp(
+    _studioId: string,
+    _command: string,
+    _port: number = 3000
+  ): Promise<string> {
+    return 'https://lightning.ai/app';
+  }
+  
   async testEndpoint(
     url: string,
     method: string = 'GET',
@@ -185,7 +180,7 @@ export class LightningStudioManager {
         headers,
         data: body,
         timeout: 30000,
-        validateStatus: () => true // Don't throw on any status
+        validateStatus: () => true
       });
       
       const responseTime = Date.now() - startTime;
@@ -196,7 +191,7 @@ export class LightningStudioManager {
         status: response.status,
         responseTime,
         success: response.status >= 200 && response.status < 300,
-        body: JSON.stringify(response.data).substring(0, 500) // Truncate
+        body: JSON.stringify(response.data).substring(0, 500)
       };
       
     } catch (error) {
@@ -211,68 +206,12 @@ export class LightningStudioManager {
     }
   }
   
-  /**
-   * Get logs from studio
-   */
-  async getLogs(studioId: string, lines: number = 100): Promise<string> {
-    console.log(`⚡ Fetching logs from studio (last ${lines} lines)...`);
-    
-    try {
-      // Placeholder implementation
-      return `[Simulated logs for studio ${studioId}]`;
-      
-    } catch (error) {
-      console.error('Failed to get logs:', error);
-      return '';
-    }
+  async getLogs(_studioId: string, _lines: number = 100): Promise<string> {
+    return '';
   }
   
-  /**
-   * Delete studio (cleanup)
-   */
-  async deleteStudio(studioId: string): Promise<void> {
-    console.log(`⚡ Deleting studio ${studioId}...`);
-    
-    try {
-      // Placeholder: Would call Lightning API to delete
-      console.log(`✓ Studio deleted`);
-      
-    } catch (error) {
-      console.error('Failed to delete studio:', error);
-      // Don't throw - cleanup is best effort
-    }
-  }
-  
-  /**
-   * Helper: Zip a directory
-   */
-  private async zipDirectory(sourceDir: string, outPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const output = fs.createWriteStream(outPath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      
-      output.on('close', () => resolve());
-      archive.on('error', (err) => reject(err));
-      
-      archive.pipe(output);
-      
-      // Add directory contents, excluding common ignore patterns
-      archive.glob('**/*', {
-        cwd: sourceDir,
-        ignore: [
-          'node_modules/**',
-          '.git/**',
-          'dist/**',
-          'build/**',
-          '__pycache__/**',
-          '*.log',
-          '.env',
-          '.DS_Store'
-        ]
-      });
-      
-      archive.finalize();
-    });
+  async deleteStudio(_studioId: string): Promise<void> {
+    // Handled automatically by Lightning
   }
 }
 
@@ -295,6 +234,10 @@ export function isLightningExecutionEnabled(): boolean {
   const enabled = process.env.ENABLE_LIGHTNING_EXECUTION === 'true';
   const hasApiKey = !!process.env.LIGHTNING_API_KEY;
   
+  if (enabled && !hasApiKey) {
+    console.warn('⚠️  Lightning execution enabled but LIGHTNING_API_KEY not set');
+    return false;
+  }
+  
   return enabled && hasApiKey;
 }
-
