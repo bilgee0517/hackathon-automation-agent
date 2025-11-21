@@ -83,51 +83,150 @@ function extractVideoURL($) {
   return videoURL;
 }
 
+// Helper function to extract all images
+function extractImages($) {
+  const images = [];
+  
+  // Cover image
+  const coverImage = $('meta[property="og:image"]').attr('content');
+  if (coverImage) {
+    images.push({
+      url: coverImage,
+      type: 'cover',
+      alt: 'Project cover image'
+    });
+  }
+  
+  // Gallery and content images
+  $('#gallery img, #app-details-left img, .software-list img').each((i, elem) => {
+    const src = $(elem).attr('src') || $(elem).attr('data-src');
+    const alt = $(elem).attr('alt') || '';
+    
+    if (src && !images.find(img => img.url === src)) {
+      images.push({
+        url: src,
+        type: 'screenshot',
+        alt: alt
+      });
+    }
+  });
+  
+  // Linked images
+  $('#app-details-left a').each((i, elem) => {
+    const href = $(elem).attr('href');
+    if (href && (href.includes('.png') || href.includes('.jpg') || href.includes('.jpeg') || href.includes('.gif') || href.includes('.webp'))) {
+      if (!images.find(img => img.url === href)) {
+        images.push({
+          url: href,
+          type: 'screenshot',
+          alt: $(elem).find('img').attr('alt') || ''
+        });
+      }
+    }
+  });
+  
+  return images;
+}
+
 // Helper function to extract full story content
-function extractStoryContent($) {
-  // Look for the main content div
+function extractDescription($) {
   const storySection = $('#app-details-left');
   
   if (storySection.length > 0) {
-    // Get plain text version
     let text = storySection.text().trim();
-    // Clean up excessive whitespace
     text = text.replace(/\s+/g, ' ').trim();
-    
     return text;
   }
   
   return '';
 }
 
-// Helper function to extract links (GitHub, Try it out, etc.)
+// Helper function to extract categorized links
 function extractLinks($) {
   const links = {
-    github: null,
-    demo: null,
+    github: [],
+    demo: [],
+    video: [],
     other: []
   };
   
-  // Look for links in various sections
   $('#app-details-left a, .software-links a, .app-links a').each((i, elem) => {
     const href = $(elem).attr('href');
     const text = $(elem).text().trim();
     
-    if (!href) return;
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
     
-    if (href.includes('github.com')) {
-      links.github = href;
-    } else if (text.toLowerCase().includes('demo') || text.toLowerCase().includes('try')) {
-      links.demo = href;
+    const linkData = { url: href, text: text };
+    
+    if (href.includes('github.com') || href.includes('gitlab.com') || href.includes('bitbucket.org')) {
+      if (!links.github.find(l => l.url === href)) {
+        links.github.push(linkData);
+      }
+    } else if (href.includes('youtube.com') || href.includes('youtu.be') || href.includes('vimeo.com') || href.includes('loom.com')) {
+      if (!links.video.find(l => l.url === href)) {
+        links.video.push(linkData);
+      }
+    } else if (text.toLowerCase().includes('demo') || text.toLowerCase().includes('try') || text.toLowerCase().includes('live')) {
+      if (!links.demo.find(l => l.url === href)) {
+        links.demo.push(linkData);
+      }
     } else if (href.startsWith('http') && !href.includes('devpost.com')) {
-      links.other.push({
-        url: href,
-        text: text
-      });
+      if (!links.other.find(l => l.url === href)) {
+        links.other.push(linkData);
+      }
     }
   });
   
   return links;
+}
+
+// Helper function to extract team members with avatars
+function extractTeamMembers($) {
+  const teamMembers = [];
+  
+  $('#app-team li.software-team-member').each((i, elem) => {
+    const $member = $(elem);
+    const nameLink = $member.find('a.user-profile-link');
+    const name = nameLink.text().trim();
+    const profileURL = nameLink.attr('href');
+    const avatar = $member.find('img').attr('src') || null;
+    
+    let role = '';
+    const bubble = $member.find('.bubble p');
+    if (bubble.length > 0) {
+      role = bubble.text().trim();
+    }
+    
+    if (name) {
+      teamMembers.push({
+        name,
+        role: role || null,
+        profileURL: profileURL ? `https://devpost.com${profileURL}` : null,
+        avatar: avatar
+      });
+    }
+  });
+  
+  return teamMembers;
+}
+
+// Helper function to extract awards
+function extractAwards($) {
+  const awards = [];
+  
+  $('#submissions .software-list-content .winner, span.winner').each((i, elem) => {
+    const awardText = $(elem).text().trim();
+    if (awardText && awardText.length > 0 && !awardText.startsWith('Submitted')) {
+      if (!awards.find(a => a.title === awardText)) {
+        awards.push({
+          title: awardText,
+          isWinner: true
+        });
+      }
+    }
+  });
+  
+  return awards;
 }
 
 // Step 1: Collect all project URLs from gallery pages
@@ -179,7 +278,10 @@ async function scrapeProjectPage(url) {
     const tagline = $('meta[property="og:description"]').attr('content')?.trim() || '';
     
     // Extract full story content for description
-    const description = extractStoryContent($);
+    const description = extractDescription($);
+    
+    // Extract all images
+    const images = extractImages($);
     
     // Extract video URL
     const videoURL = extractVideoURL($);
@@ -200,29 +302,14 @@ async function scrapeProjectPage(url) {
       }
     });
     
-    // Extract team members (as simple strings)
-    const teamMembers = [];
-    $('#app-team li.software-team-member').each((i, elem) => {
-      const $member = $(elem);
-      const nameLink = $member.find('a.user-profile-link');
-      const name = nameLink.text().trim();
-      
-      if (name) {
-        teamMembers.push(name);
-      }
-    });
+    // Extract team members with avatars
+    const teamMembers = extractTeamMembers($);
     
-    // Extract awards/prizes
-    const awards = [];
-    $('span.winner.label, .winner').each((i, elem) => {
-      const awardText = $(elem).text().trim();
-      if (awardText && awardText.length > 0 && !awardText.startsWith('Submitted')) {
-        awards.push(awardText);
-      }
-    });
+    // Extract full award information
+    const awards = extractAwards($);
     
     // Determine status based on awards
-    const status = awards.length > 0 ? 'winner' : 'analyzing';
+    const status = awards.some(a => a.isWinner) ? 'winner' : 'analyzing';
     
     // Extract hackathon submission info
     let hackathonName = '';
@@ -247,8 +334,8 @@ async function scrapeProjectPage(url) {
     const likes = parseInt($('.like-count').text().trim()) || 0;
     const comments = parseInt($('.comment-count').text().trim()) || 0;
     
-    // Extract cover image
-    const coverImage = $('meta[property="og:image"]').attr('content') || null;
+    // Extract submission date
+    const submittedDate = $('#submissions time').attr('datetime') || new Date().toISOString();
     
     const projectData = {
       title,
@@ -256,8 +343,8 @@ async function scrapeProjectPage(url) {
       url,
       tagline,
       description,
+      images,
       videoURL,
-      coverImage,
       technologies,
       teamMembers,
       awards,
@@ -271,6 +358,7 @@ async function scrapeProjectPage(url) {
         likes,
         comments
       },
+      submittedAt: submittedDate,
       scrapedAt: new Date().toISOString()
     };
     
