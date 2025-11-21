@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {sanityFetch} from '@/sanity/lib/live'
 import {projectQuery, projectSlugsQuery} from '@/sanity/lib/queries'
-import {SponsorIntegrationCard} from '@/app/components/SponsorIntegrationCard'
+import {SponsorAnalysisCard} from '@/app/components/SponsorAnalysisCard'
 import {JudgeNoteCard} from '@/app/components/JudgeNoteCard'
 import {urlForImage} from '@/sanity/lib/utils'
 import type {Metadata} from 'next'
@@ -145,25 +145,86 @@ export default async function ProjectPage(props: Props) {
             )}
 
             {/* AI Summary */}
-            {project.analysisData?.aiSummaryForJudges && (
+            {project.overallSummary && (
               <section className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
                 <h2 className="mb-3 text-sm font-semibold uppercase text-blue-900">
-                  🤖 AI Analysis
+                  🤖 AI Analysis Summary
                 </h2>
-                <p className="leading-relaxed text-gray-700">
-                  {project.analysisData.aiSummaryForJudges}
-                </p>
+                <p className="leading-relaxed text-gray-700">{project.overallSummary}</p>
               </section>
             )}
 
-            {/* Sponsor Integrations */}
-            {project.sponsorIntegrations && project.sponsorIntegrations.length > 0 && (
-              <section className="mb-8">
-                <h2 className="mb-6 text-3xl font-bold text-gray-900">Sponsor Integrations</h2>
-                <div className="grid gap-6">
-                  {project.sponsorIntegrations.map((integration, i) => (
-                    <SponsorIntegrationCard key={i} integration={integration} />
+            {/* Innovative Aspects */}
+            {project.innovativeAspects && project.innovativeAspects.length > 0 && (
+              <section className="mb-8 rounded-lg border border-purple-200 bg-purple-50 p-6">
+                <h2 className="mb-3 text-sm font-semibold uppercase text-purple-900">
+                  ✨ Innovative Aspects
+                </h2>
+                <ul className="list-disc space-y-1 pl-5 text-gray-700">
+                  {project.innovativeAspects.map((aspect, i) => (
+                    <li key={i}>{aspect}</li>
                   ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Repository Stats */}
+            {project.repositoryStats && (
+              <section className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+                <h2 className="mb-4 text-2xl font-bold text-gray-900">Repository Statistics</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {project.repositoryStats.mainLanguage && (
+                    <div>
+                      <div className="text-sm text-gray-600">Main Language</div>
+                      <div className="text-lg font-semibold">
+                        {project.repositoryStats.mainLanguage}
+                      </div>
+                    </div>
+                  )}
+                  {project.repositoryStats.totalFiles !== undefined && (
+                    <div>
+                      <div className="text-sm text-gray-600">Total Files</div>
+                      <div className="text-lg font-semibold">
+                        {project.repositoryStats.totalFiles}
+                      </div>
+                    </div>
+                  )}
+                  {project.repositoryStats.hasTests !== undefined && (
+                    <div>
+                      <div className="text-sm text-gray-600">Has Tests</div>
+                      <div className="text-lg font-semibold">
+                        {project.repositoryStats.hasTests ? '✅ Yes' : '❌ No'}
+                      </div>
+                    </div>
+                  )}
+                  {project.repositoryStats.testsPassed !== undefined &&
+                    project.repositoryStats.testsPassed !== null && (
+                      <div>
+                        <div className="text-sm text-gray-600">Tests Passed</div>
+                        <div className="text-lg font-semibold">
+                          {project.repositoryStats.testsPassed ? '✅ Yes' : '❌ No'}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </section>
+            )}
+
+            {/* Sponsor Analysis */}
+            {project.sponsors && Object.keys(project.sponsors).length > 0 && (
+              <section className="mb-8">
+                <h2 className="mb-6 text-3xl font-bold text-gray-900">Sponsor Technology Analysis</h2>
+                <div className="grid gap-6">
+                  {Object.entries(project.sponsors)
+                    .filter(([_, analysis]) => analysis?.detected)
+                    .sort(([_, a], [__, b]) => (b?.integrationScore || 0) - (a?.integrationScore || 0))
+                    .map(([sponsorSlug, analysis]) => (
+                      <SponsorAnalysisCard
+                        key={sponsorSlug}
+                        sponsorSlug={sponsorSlug}
+                        analysis={analysis}
+                      />
+                    ))}
                 </div>
               </section>
             )}
@@ -244,19 +305,48 @@ export default async function ProjectPage(props: Props) {
               </section>
             )}
 
-            {/* Tags */}
-            {project.analysisData?.tags && project.analysisData.tags.length > 0 && (
+            {/* Detected Sponsors */}
+            {project.sponsors && (
               <section className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-                <h3 className="mb-4 text-lg font-bold text-gray-900">Tags</h3>
+                <h3 className="mb-4 text-lg font-bold text-gray-900">Detected Technologies</h3>
                 <div className="flex flex-wrap gap-2">
-                  {project.analysisData.tags.map((tag, i) => (
-                    <span
-                      key={i}
-                      className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+                  {Object.entries(project.sponsors)
+                    .filter(([_, analysis]) => analysis?.detected)
+                    .sort(([_, a], [__, b]) => (b?.integrationScore || 0) - (a?.integrationScore || 0))
+                    .map(([sponsorSlug, analysis], i) => {
+                      const names: Record<string, string> = {
+                        aws: 'AWS',
+                        skyflow: 'Skyflow',
+                        postman: 'Postman',
+                        redis: 'Redis',
+                        forethought: 'Forethought',
+                        finsterAI: 'Finster AI',
+                        senso: 'Senso',
+                        anthropic: 'Anthropic',
+                        sanity: 'Sanity',
+                        trmLabs: 'TRM Labs',
+                        coder: 'Coder',
+                        lightpanda: 'Lightpanda',
+                        lightningAI: 'Lightning AI',
+                        parallel: 'Parallel',
+                        cleric: 'Cleric',
+                      }
+                      const name = names[sponsorSlug] || sponsorSlug
+                      const scoreColor =
+                        (analysis?.integrationScore || 0) >= 7
+                          ? 'bg-green-100 text-green-800'
+                          : (analysis?.integrationScore || 0) >= 4
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                      return (
+                        <span
+                          key={i}
+                          className={`rounded-full px-3 py-1 text-sm font-medium ${scoreColor}`}
+                        >
+                          {name} {analysis?.integrationScore}/10
+                        </span>
+                      )
+                    })}
                 </div>
               </section>
             )}
@@ -264,7 +354,7 @@ export default async function ProjectPage(props: Props) {
             {/* GitHub Data */}
             {project.githubData && (
               <section className="rounded-lg border border-gray-200 bg-white p-6">
-                <h3 className="mb-4 text-lg font-bold text-gray-900">Repository Stats</h3>
+                <h3 className="mb-4 text-lg font-bold text-gray-900">GitHub Stats</h3>
                 <div className="space-y-2 text-sm">
                   {project.githubData.language && (
                     <div className="flex justify-between">

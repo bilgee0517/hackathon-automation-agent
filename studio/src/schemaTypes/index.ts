@@ -1,6 +1,6 @@
 import {hacker} from './documents/hacker'
 import {project} from './documents/project'
-import {sponsorIntegration} from './objects/sponsorIntegration'
+import {sponsorAnalysis} from './objects/sponsorAnalysis'
 
 // Export an array of all the schema types for the hackathon dashboard
 export const schemaTypes = [
@@ -9,5 +9,5 @@ export const schemaTypes = [
   hacker,
 
   // Objects
-  sponsorIntegration,
+  sponsorAnalysis,
 ]

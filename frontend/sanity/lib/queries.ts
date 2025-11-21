@@ -16,20 +16,11 @@ export const allProjectsQuery = defineQuery(`
     demoUrl,
     "thumbnail": screenshots[0],
     submittedAt,
+    analyzedAt,
     status,
-    analysisData {
-      aiSummaryForJudges,
-      latestAnalysisAt,
-      tags
-    },
-    sponsorIntegrations[] {
-      sponsorSlug,
-      sponsorName,
-      integrationDepth,
-      technicalScore,
-      creativityScore,
-      toolsUsed
-    },
+    overallSummary,
+    repositoryStats,
+    sponsors,
     team[]-> {
       _id,
       name,
@@ -52,23 +43,12 @@ export const projectQuery = defineQuery(`
     screenshots,
     githubData,
     submittedAt,
+    analyzedAt,
     status,
-    analysisData {
-      aiSummaryForJudges,
-      latestAnalysisAt,
-      tags
-    },
-    sponsorIntegrations[] {
-      sponsorSlug,
-      sponsorName,
-      aiSummary,
-      integrationDepth,
-      technicalScore,
-      creativityScore,
-      toolsUsed,
-      codeEvidence,
-      userFacingFeatures
-    },
+    overallSummary,
+    innovativeAspects,
+    repositoryStats,
+    sponsors,
     team[]-> {
       _id,
       name,
@@ -77,34 +57,29 @@ export const projectQuery = defineQuery(`
       avatar,
       bio
     },
-    "judgeNotes": *[_type == "judgeNote" && project._ref == ^._id && isPublic == true] | order(createdAt desc) {
-      _id,
+    judgeNotes[] {
       judgeName,
       judgeRole,
       sponsorAffiliation,
       comment,
       scoreOverride,
       highlightedFor,
+      isPublic,
       createdAt
     }
   }
 `)
 
-// Get projects filtered by sponsor
+// Get projects filtered by sponsor (using new sponsors object structure)
+// To filter by sponsor, check if sponsors.{sponsorName}.detected == true
 export const projectsBySponsorQuery = defineQuery(`
-  *[_type == "project" && $sponsorSlug in sponsorIntegrations[].sponsorSlug] | order(sponsorIntegrations[sponsorSlug == $sponsorSlug][0].technicalScore desc) {
+  *[_type == "project" && sponsors[$sponsorSlug].detected == true] | order(sponsors[$sponsorSlug].integrationScore desc) {
     _id,
     projectName,
     "slug": slug.current,
     tagline,
     "thumbnail": screenshots[0],
-    "sponsorIntegration": sponsorIntegrations[sponsorSlug == $sponsorSlug][0] {
-      aiSummary,
-      integrationDepth,
-      technicalScore,
-      creativityScore,
-      toolsUsed
-    },
+    "sponsorAnalysis": sponsors[$sponsorSlug],
     team[]-> {
       _id,
       name,
@@ -114,18 +89,20 @@ export const projectsBySponsorQuery = defineQuery(`
 `)
 
 // Get all judge notes for a specific project (including private ones - for admin view)
+// Note: judgeNotes are embedded in the project document, not separate documents
 export const allJudgeNotesForProjectQuery = defineQuery(`
-  *[_type == "judgeNote" && project._ref == $projectId] | order(createdAt desc) {
-    _id,
-    judgeName,
-    judgeRole,
-    sponsorAffiliation,
-    comment,
-    scoreOverride,
-    isPublic,
-    highlightedFor,
-    createdAt
-  }
+  *[_type == "project" && _id == $projectId][0] {
+    judgeNotes[] {
+      judgeName,
+      judgeRole,
+      sponsorAffiliation,
+      comment,
+      scoreOverride,
+      isPublic,
+      highlightedFor,
+      createdAt
+    }
+  }.judgeNotes
 `)
 
 // Get slugs for static generation

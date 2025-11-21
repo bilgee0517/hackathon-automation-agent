@@ -72,43 +72,73 @@ export const project = defineType({
       of: [{type: 'reference', to: [{type: 'hacker'}]}],
     }),
 
-    // AI Analysis Output
+    // AI Analysis Timestamp
     defineField({
-      name: 'analysisData',
-      title: 'AI Analysis Data',
+      name: 'analyzedAt',
+      title: 'Analyzed At',
+      type: 'datetime',
+      description: 'When the AI agent analyzed this project',
+    }),
+
+    // Repository Statistics (from backend AI analysis)
+    defineField({
+      name: 'repositoryStats',
+      title: 'Repository Statistics',
       type: 'object',
       description: 'Automatically populated by the AI agent',
       fields: [
+        {name: 'mainLanguage', type: 'string', title: 'Main Language'},
+        {name: 'totalFiles', type: 'number', title: 'Total Files'},
+        {name: 'hasTests', type: 'boolean', title: 'Has Tests'},
+        {name: 'testsPassed', type: 'boolean', title: 'Tests Passed'},
         {
-          name: 'aiSummaryForJudges',
-          title: 'AI Summary for Judges',
-          type: 'text',
-          rows: 6,
-          description: 'General summary explaining the project for judges',
-        },
-        {
-          name: 'latestAnalysisAt',
-          title: 'Latest Analysis Time',
-          type: 'datetime',
-          description: 'When the agent last analyzed this project',
-        },
-        {
-          name: 'tags',
-          title: 'Tags',
+          name: 'dependencies',
           type: 'array',
+          title: 'Dependencies',
           of: [{type: 'string'}],
-          description: 'Keywords for filtering (sponsor names, categories, etc.)',
         },
       ],
     }),
 
-    // Sponsor Integration Details
+    // AI Analysis Summaries
     defineField({
-      name: 'sponsorIntegrations',
-      title: 'Sponsor Integrations',
+      name: 'overallSummary',
+      title: 'Overall Summary',
+      type: 'text',
+      rows: 6,
+      description: 'AI-generated high-level summary of the project',
+    }),
+    defineField({
+      name: 'innovativeAspects',
+      title: 'Innovative Aspects',
       type: 'array',
-      of: [{type: 'sponsorIntegration'}],
-      description: 'Detailed breakdown of how each sponsor tool was used',
+      of: [{type: 'string'}],
+      description: 'Unique or creative aspects identified by the AI',
+    }),
+
+    // Sponsor Analysis (from backend - 15 sponsors)
+    defineField({
+      name: 'sponsors',
+      title: 'Sponsor Analysis',
+      type: 'object',
+      description: 'AI analysis results for each sponsor technology',
+      fields: [
+        {name: 'aws', type: 'sponsorAnalysis', title: 'AWS'},
+        {name: 'skyflow', type: 'sponsorAnalysis', title: 'Skyflow'},
+        {name: 'postman', type: 'sponsorAnalysis', title: 'Postman'},
+        {name: 'redis', type: 'sponsorAnalysis', title: 'Redis'},
+        {name: 'forethought', type: 'sponsorAnalysis', title: 'Forethought'},
+        {name: 'finsterAI', type: 'sponsorAnalysis', title: 'Finster AI'},
+        {name: 'senso', type: 'sponsorAnalysis', title: 'Senso'},
+        {name: 'anthropic', type: 'sponsorAnalysis', title: 'Anthropic'},
+        {name: 'sanity', type: 'sponsorAnalysis', title: 'Sanity'},
+        {name: 'trmLabs', type: 'sponsorAnalysis', title: 'TRM Labs'},
+        {name: 'coder', type: 'sponsorAnalysis', title: 'Coder'},
+        {name: 'lightpanda', type: 'sponsorAnalysis', title: 'Lightpanda'},
+        {name: 'lightningAI', type: 'sponsorAnalysis', title: 'Lightning AI'},
+        {name: 'parallel', type: 'sponsorAnalysis', title: 'Parallel'},
+        {name: 'cleric', type: 'sponsorAnalysis', title: 'Cleric'},
+      ],
     }),
 
     // Submission Info
@@ -280,15 +310,17 @@ export const project = defineType({
       title: 'projectName',
       team: 'team',
       status: 'status',
+      analyzedAt: 'analyzedAt',
       media: 'screenshots.0',
     },
     prepare(selection: {
       title?: string
       team?: any[]
       status?: string
+      analyzedAt?: string
       media?: any
     }) {
-      const {title, team, status, media} = selection
+      const {title, team, status, analyzedAt, media} = selection
       const statusEmoji =
         {
           analyzing: '⏳',
@@ -297,9 +329,13 @@ export const project = defineType({
           winner: '🏆',
         }[status || ''] || ''
 
+      const analyzedText = analyzedAt
+        ? ` | Analyzed ${new Date(analyzedAt).toLocaleDateString()}`
+        : ''
+
       return {
         title: title || 'Untitled Project',
-        subtitle: `${statusEmoji} ${status || 'unknown'} | Team: ${team?.length || 0} members`,
+        subtitle: `${statusEmoji} ${status || 'unknown'} | Team: ${team?.length || 0}${analyzedText}`,
         media,
       }
     },

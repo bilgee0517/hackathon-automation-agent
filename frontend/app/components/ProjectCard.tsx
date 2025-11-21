@@ -2,6 +2,21 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {urlForImage} from '@/sanity/lib/utils'
 
+type SponsorAnalysis = {
+  detected: boolean
+  integrationScore: number
+  technicalSummary: string
+  plainEnglishSummary: string
+  evidence: {
+    files: string[]
+    codeSnippets: string[]
+    keyFindings: string[]
+  }
+  prizeEligible: boolean
+  confidence: number
+  suggestions: string[]
+}
+
 type Project = {
   _id: string
   projectName: string
@@ -11,13 +26,8 @@ type Project = {
   thumbnail?: any
   status: string
   submittedAt: string
-  sponsorIntegrations?: Array<{
-    sponsorSlug: string
-    sponsorName?: string
-    integrationDepth?: string
-    technicalScore?: number
-    creativityScore?: number
-  }>
+  analyzedAt?: string
+  sponsors?: Record<string, SponsorAnalysis>
   team?: Array<{
     _id: string
     name: string
@@ -27,7 +37,19 @@ type Project = {
 }
 
 export function ProjectCard({project}: {project: Project}) {
-  const {projectName, slug, tagline, status, sponsorIntegrations, team, thumbnail} = project
+  const {projectName, slug, tagline, status, sponsors, team, thumbnail} = project
+
+  // Extract detected sponsors from the sponsors object
+  const detectedSponsors = sponsors
+    ? Object.entries(sponsors)
+        .filter(([_, data]) => data?.detected)
+        .map(([key, data]) => ({
+          slug: key,
+          name: formatSponsorName(key),
+          score: data.integrationScore,
+        }))
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+    : []
 
   const statusColors = {
     analyzing: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -41,6 +63,28 @@ export function ProjectCard({project}: {project: Project}) {
     analyzed: '✅ Analyzed',
     failed: '❌ Failed',
     winner: '🏆 Winner',
+  }
+
+  // Helper function to format sponsor names
+  function formatSponsorName(slug: string): string {
+    const names: Record<string, string> = {
+      aws: 'AWS',
+      skyflow: 'Skyflow',
+      postman: 'Postman',
+      redis: 'Redis',
+      forethought: 'Forethought',
+      finsterAI: 'Finster AI',
+      senso: 'Senso',
+      anthropic: 'Anthropic',
+      sanity: 'Sanity',
+      trmLabs: 'TRM Labs',
+      coder: 'Coder',
+      lightpanda: 'Lightpanda',
+      lightningAI: 'Lightning AI',
+      parallel: 'Parallel',
+      cleric: 'Cleric',
+    }
+    return names[slug] || slug
   }
 
   return (
@@ -82,19 +126,22 @@ export function ProjectCard({project}: {project: Project}) {
       {tagline && <p className="mb-4 text-sm text-gray-600 line-clamp-2">{tagline}</p>}
 
       {/* Sponsor Tools */}
-      {sponsorIntegrations && sponsorIntegrations.length > 0 && (
+      {detectedSponsors.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
-          {sponsorIntegrations.slice(0, 3).map((integration, i) => (
+          {detectedSponsors.slice(0, 3).map((sponsor, i) => (
             <div
               key={i}
               className="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
             >
-              {integration.sponsorName || integration.sponsorSlug}
+              {sponsor.name}
+              {sponsor.score && (
+                <span className="ml-1 text-[10px] font-bold">{sponsor.score}/10</span>
+              )}
             </div>
           ))}
-          {sponsorIntegrations.length > 3 && (
+          {detectedSponsors.length > 3 && (
             <div className="flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-              +{sponsorIntegrations.length - 3} more
+              +{detectedSponsors.length - 3} more
             </div>
           )}
         </div>
