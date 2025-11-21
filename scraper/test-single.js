@@ -38,51 +38,150 @@ function extractVideoURL($) {
   return videoURL;
 }
 
+// Helper function to extract all images
+function extractImages($) {
+  const images = [];
+  
+  // Cover image
+  const coverImage = $('meta[property="og:image"]').attr('content');
+  if (coverImage) {
+    images.push({
+      url: coverImage,
+      type: 'cover',
+      alt: 'Project cover image'
+    });
+  }
+  
+  // Gallery and content images
+  $('#gallery img, #app-details-left img, .software-list img').each((i, elem) => {
+    const src = $(elem).attr('src') || $(elem).attr('data-src');
+    const alt = $(elem).attr('alt') || '';
+    
+    if (src && !images.find(img => img.url === src)) {
+      images.push({
+        url: src,
+        type: 'screenshot',
+        alt: alt
+      });
+    }
+  });
+  
+  // Linked images
+  $('#app-details-left a').each((i, elem) => {
+    const href = $(elem).attr('href');
+    if (href && (href.includes('.png') || href.includes('.jpg') || href.includes('.jpeg') || href.includes('.gif') || href.includes('.webp'))) {
+      if (!images.find(img => img.url === href)) {
+        images.push({
+          url: href,
+          type: 'screenshot',
+          alt: $(elem).find('img').attr('alt') || ''
+        });
+      }
+    }
+  });
+  
+  return images;
+}
+
 // Helper function to extract full story content
-function extractStoryContent($) {
-  // Look for the main content div
+function extractDescription($) {
   const storySection = $('#app-details-left');
   
   if (storySection.length > 0) {
-    // Get plain text version
     let text = storySection.text().trim();
-    // Clean up excessive whitespace
     text = text.replace(/\s+/g, ' ').trim();
-    
     return text;
   }
   
   return '';
 }
 
-// Helper function to extract links (GitHub, Try it out, etc.)
+// Helper function to extract categorized links
 function extractLinks($) {
   const links = {
-    github: null,
-    demo: null,
+    github: [],
+    demo: [],
+    video: [],
     other: []
   };
   
-  // Look for links in various sections
   $('#app-details-left a, .software-links a, .app-links a').each((i, elem) => {
     const href = $(elem).attr('href');
     const text = $(elem).text().trim();
     
-    if (!href) return;
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
     
-    if (href.includes('github.com')) {
-      links.github = href;
-    } else if (text.toLowerCase().includes('demo') || text.toLowerCase().includes('try')) {
-      links.demo = href;
+    const linkData = { url: href, text: text };
+    
+    if (href.includes('github.com') || href.includes('gitlab.com') || href.includes('bitbucket.org')) {
+      if (!links.github.find(l => l.url === href)) {
+        links.github.push(linkData);
+      }
+    } else if (href.includes('youtube.com') || href.includes('youtu.be') || href.includes('vimeo.com') || href.includes('loom.com')) {
+      if (!links.video.find(l => l.url === href)) {
+        links.video.push(linkData);
+      }
+    } else if (text.toLowerCase().includes('demo') || text.toLowerCase().includes('try') || text.toLowerCase().includes('live')) {
+      if (!links.demo.find(l => l.url === href)) {
+        links.demo.push(linkData);
+      }
     } else if (href.startsWith('http') && !href.includes('devpost.com')) {
-      links.other.push({
-        url: href,
-        text: text
-      });
+      if (!links.other.find(l => l.url === href)) {
+        links.other.push(linkData);
+      }
     }
   });
   
   return links;
+}
+
+// Helper function to extract team members with avatars
+function extractTeamMembers($) {
+  const teamMembers = [];
+  
+  $('#app-team li.software-team-member').each((i, elem) => {
+    const $member = $(elem);
+    const nameLink = $member.find('a.user-profile-link');
+    const name = nameLink.text().trim();
+    const profileURL = nameLink.attr('href');
+    const avatar = $member.find('img').attr('src') || null;
+    
+    let role = '';
+    const bubble = $member.find('.bubble p');
+    if (bubble.length > 0) {
+      role = bubble.text().trim();
+    }
+    
+    if (name) {
+      teamMembers.push({
+        name,
+        role: role || null,
+        profileURL: profileURL ? `https://devpost.com${profileURL}` : null,
+        avatar: avatar
+      });
+    }
+  });
+  
+  return teamMembers;
+}
+
+// Helper function to extract awards
+function extractAwards($) {
+  const awards = [];
+  
+  $('#submissions .software-list-content .winner, span.winner').each((i, elem) => {
+    const awardText = $(elem).text().trim();
+    if (awardText && awardText.length > 0 && !awardText.startsWith('Submitted')) {
+      if (!awards.find(a => a.title === awardText)) {
+        awards.push({
+          title: awardText,
+          isWinner: true
+        });
+      }
+    }
+  });
+  
+  return awards;
 }
 
 // Main scrape function
@@ -114,12 +213,16 @@ async function scrapeProject(url) {
     console.log('✓ Tagline:', tagline);
     
     // Extract full story content for description
-    const description = extractStoryContent($);
+    const description = extractDescription($);
     console.log('✓ Description length:', description.length, 'characters');
+    
+    // Extract all images
+    const images = extractImages($);
+    console.log('✓ Images found:', images.length);
     
     // Extract video URL
     const videoURL = extractVideoURL($);
-    console.log('✓ Video URL:', videoURL || 'None found');
+    console.log('✓ Video URL:', videoURL || 'None');
     
     // Extract technologies (Built With)
     const technologies = [];
@@ -138,31 +241,16 @@ async function scrapeProject(url) {
     });
     console.log('✓ Technologies:', technologies);
     
-    // Extract team members (as simple strings)
-    const teamMembers = [];
-    $('#app-team li.software-team-member').each((i, elem) => {
-      const $member = $(elem);
-      const nameLink = $member.find('a.user-profile-link');
-      const name = nameLink.text().trim();
-      
-      if (name) {
-        teamMembers.push(name);
-      }
-    });
-    console.log('✓ Team members:', teamMembers);
+    // Extract team members with avatars
+    const teamMembers = extractTeamMembers($);
+    console.log('✓ Team members:', teamMembers.length);
     
-    // Extract awards/prizes
-    const awards = [];
-    $('span.winner.label, .winner').each((i, elem) => {
-      const awardText = $(elem).text().trim();
-      if (awardText && awardText.length > 0 && !awardText.startsWith('Submitted')) {
-        awards.push(awardText);
-      }
-    });
+    // Extract full award information
+    const awards = extractAwards($);
     console.log('✓ Awards:', awards);
     
     // Determine status based on awards
-    const status = awards.length > 0 ? 'winner' : 'analyzing';
+    const status = awards.some(a => a.isWinner) ? 'winner' : 'analyzing';
     console.log('✓ Status:', status);
     
     // Extract hackathon submission info
@@ -179,10 +267,9 @@ async function scrapeProject(url) {
     });
     console.log('✓ Hackathon:', hackathonName);
     
-    // Extract links (GitHub, demo, etc.)
+    // Extract links with better categorization
     const links = extractLinks($);
-    console.log('✓ GitHub:', links.github || 'None found');
-    console.log('✓ Demo:', links.demo || 'None found');
+    console.log('✓ Links - GitHub:', links.github.length, 'Demo:', links.demo.length, 'Video:', links.video.length);
     
     // Extract project slug from URL
     const slug = url.split('/software/')[1] || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -190,11 +277,9 @@ async function scrapeProject(url) {
     // Extract likes and comments
     const likes = parseInt($('.like-count').text().trim()) || 0;
     const comments = parseInt($('.comment-count').text().trim()) || 0;
-    console.log('✓ Stats: Likes:', likes, 'Comments:', comments);
     
-    // Extract cover image
-    const coverImage = $('meta[property="og:image"]').attr('content') || null;
-    console.log('✓ Cover image:', coverImage ? 'Found' : 'None');
+    // Extract submission date
+    const submittedDate = $('#submissions time').attr('datetime') || new Date().toISOString();
     
     const projectData = {
       title,
@@ -202,8 +287,8 @@ async function scrapeProject(url) {
       url,
       tagline,
       description,
+      images,
       videoURL,
-      coverImage,
       technologies,
       teamMembers,
       awards,
@@ -217,6 +302,7 @@ async function scrapeProject(url) {
         likes,
         comments
       },
+      submittedAt: submittedDate,
       scrapedAt: new Date().toISOString()
     };
     
@@ -228,17 +314,15 @@ async function scrapeProject(url) {
   }
 }
 
-// Run the test
+// Run test
 async function main() {
-  console.log('=== Testing Devpost Scraper ===');
+  console.log('=== Testing Enhanced Scraper ===');
   console.log('Target:', TEST_URL);
   
   try {
     const projectData = await scrapeProject(TEST_URL);
     
     console.log('\n=== ✅ SUCCESS ===\n');
-    console.log('Full project data:');
-    console.log(JSON.stringify(projectData, null, 2));
     
     // Save to file
     const outputDir = path.join(__dirname, 'projects');
@@ -249,8 +333,8 @@ async function main() {
     const outputPath = path.join(outputDir, `${projectData.slug}.json`);
     fs.writeFileSync(outputPath, JSON.stringify(projectData, null, 2), 'utf-8');
     
-    console.log(`\n📁 Saved to: ${outputPath}`);
-    console.log('\n✨ Test completed successfully!');
+    console.log(`📁 Saved to: ${outputPath}`);
+    console.log('\n✨ Test completed!');
     
   } catch (error) {
     console.error('\n❌ Test failed:', error.message);
