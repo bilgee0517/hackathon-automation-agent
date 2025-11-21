@@ -34,10 +34,8 @@ const homeLocation = {
 // path for different document types and used in the presentation tool.
 function resolveHref(documentType?: string, slug?: string): string | undefined {
   switch (documentType) {
-    case 'post':
-      return slug ? `/posts/${slug}` : undefined
-    case 'page':
-      return slug ? `/${slug}` : undefined
+    case 'project':
+      return slug ? `/projects/${slug}` : undefined
     default:
       console.warn('Invalid document type:', documentType)
       return undefined
@@ -66,51 +64,28 @@ export default defineConfig({
         mainDocuments: defineDocuments([
           {
             route: '/',
-            filter: `_type == "settings" && _id == "siteSettings"`,
+            filter: `_type == "project"`,
           },
           {
-            route: '/:slug',
-            filter: `_type == "page" && slug.current == $slug || _id == $slug`,
-          },
-          {
-            route: '/posts/:slug',
-            filter: `_type == "post" && slug.current == $slug || _id == $slug`,
+            route: '/projects/:slug',
+            filter: `_type == "project" && slug.current == $slug || _id == $slug`,
           },
         ]),
         // Locations Resolver API allows you to define where data is being used in your application. https://www.sanity.io/docs/presentation-resolver-api#8d8bca7bfcd7
         locations: {
-          settings: defineLocations({
-            locations: [homeLocation],
-            message: 'This document is used on all pages',
-            tone: 'positive',
-          }),
-          page: defineLocations({
+          project: defineLocations({
             select: {
-              name: 'name',
+              projectName: 'projectName',
               slug: 'slug.current',
             },
             resolve: (doc) => ({
               locations: [
                 {
-                  title: doc?.name || 'Untitled',
-                  href: resolveHref('page', doc?.slug)!,
-                },
-              ],
-            }),
-          }),
-          post: defineLocations({
-            select: {
-              title: 'title',
-              slug: 'slug.current',
-            },
-            resolve: (doc) => ({
-              locations: [
-                {
-                  title: doc?.title || 'Untitled',
-                  href: resolveHref('post', doc?.slug)!,
+                  title: doc?.projectName || 'Untitled',
+                  href: resolveHref('project', doc?.slug)!,
                 },
                 {
-                  title: 'Home',
+                  title: 'Dashboard',
                   href: '/',
                 } satisfies DocumentLocation,
               ].filter(Boolean) as DocumentLocation[],

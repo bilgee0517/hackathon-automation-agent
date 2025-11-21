@@ -1,9 +1,10 @@
-import {RocketIcon, UsersIcon} from '@sanity/icons'
+import {RocketIcon, UsersIcon, CommentIcon} from '@sanity/icons'
 import type {StructureBuilder, StructureResolver} from 'sanity/structure'
+import {JudgeNotesView} from '../components/JudgeNotesView'
 
 /**
  * Structure builder for the hackathon dashboard
- * Organizes projects and hackers in a clean sidebar
+ * Organizes projects, hackers, and judge notes in a clean sidebar
  */
 
 const DISABLED_TYPES = ['assist.instruction.context']
@@ -12,7 +13,7 @@ export const structure: StructureResolver = (S: StructureBuilder) =>
   S.list()
     .title('Hackathon Dashboard')
     .items([
-      // Projects - organized by status
+      // Projects - with inline judge notes
       S.listItem()
         .title('Projects')
         .icon(RocketIcon)
@@ -23,7 +24,26 @@ export const structure: StructureResolver = (S: StructureBuilder) =>
               S.listItem()
                 .title('All Projects')
                 .icon(RocketIcon)
-                .child(S.documentTypeList('project').title('All Projects')),
+                .child(
+                  S.documentTypeList('project')
+                    .title('All Projects')
+                    .child((documentId) =>
+                      S.document()
+                        .documentId(documentId)
+                        .schemaType('project')
+                        .views([
+                          S.view.form(),
+                          // Add a view showing judge notes for this project
+                          S.view
+                            .component(({documentId}: {documentId: string}) => (
+                              <JudgeNotesView documentId={documentId} />
+                            ))
+                            .icon(CommentIcon)
+                            .id('judgeNotes')
+                            .title('Judge Notes'),
+                        ]),
+                    ),
+                ),
               S.divider(),
               S.listItem()
                 .title('⏳ Analyzing')
@@ -58,6 +78,12 @@ export const structure: StructureResolver = (S: StructureBuilder) =>
 
       S.divider(),
 
+      // Judge Notes
+      S.listItem()
+        .title('Judge Notes')
+        .icon(CommentIcon)
+        .child(S.documentTypeList('judgeNote').title('Judge Notes')),
+
       // Hackers
       S.listItem()
         .title('Hackers')
@@ -71,3 +97,4 @@ export const structure: StructureResolver = (S: StructureBuilder) =>
         (listItem: any) => !DISABLED_TYPES.includes(listItem.getId()),
       ),
     ])
+
