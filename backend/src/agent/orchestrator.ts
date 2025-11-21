@@ -1,12 +1,14 @@
 // AI Agent Orchestrator - Core analysis engine using Claude or OpenAI
 
-import { AnalysisResult, SponsorName } from '../types';
+import { AnalysisResult, SponsorName, ExecutionResults } from '../types';
 import { tools, executeToolCall } from './tools';
 import { getAnalysisSystemPrompt, getInitialAnalysisPrompt } from './prompts';
 import { v4 as uuidv4 } from 'uuid';
 import { getAvailableProvider, getAnthropicClient, getOpenAIClient, getProviderName } from './provider';
 import { runOpenAIAnalysis } from './openai-orchestrator';
 import { runReflectionLoop } from '../services/reflection';
+import { getLightningExecutionAgent } from './lightning-executor';
+import { isLightningExecutionEnabled } from '../services/lightning';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -215,13 +217,40 @@ async function runClaudeAnalysis(
         };
         
         // Validate and ensure all required fields are present
-        const result = validateAnalysisResult(completeAnalysis);
+        let result = validateAnalysisResult(completeAnalysis);
         
         const analysisTime = Date.now() - analysisStartTime;
-        console.log('✓ Analysis complete');
+        console.log('✓ Static analysis complete');
         console.log(`  - Time taken: ${analysisTime}ms`);
         console.log(`  - Tool calls: ${totalToolCalls}`);
         console.log(`  - Iterations: ${iterationCount}`);
+        
+        // === NEW: DELEGATE TO LIGHTNING EXECUTION AGENT ===
+        if (isLightningExecutionEnabled()) {
+          onProgress?.('Running cloud execution validation...');
+          
+          try {
+            const executionResult = await runLightningExecution(
+              repoPath,
+              result,
+              projectName,
+              onProgress
+            );
+            
+            // Synthesize execution results into analysis
+            result = synthesizeExecutionResults(result, executionResult);
+            
+          } catch (executionError) {
+            console.error('⚡ Lightning execution failed (continuing):', executionError);
+            // Don't fail the whole analysis if execution fails
+            result.executionSummary = {
+              enabled: true,
+              success: false,
+              error: executionError instanceof Error ? executionError.message : 'Unknown error'
+            };
+          }
+        }
+        
         onProgress?.('Analysis complete! Running reflection...');
         
         // Run reflection loop to learn from this analysis
@@ -450,4 +479,120 @@ export function validateAnalysisResult(result: Partial<AnalysisResult>): Analysi
   
   return result as AnalysisResult;
 }
+
+/**
+ * Run Lightning AI execution validation
+ */
+async function runLightningExecution(
+  repoPath: string,
+  staticAnalysis: AnalysisResult,
+  projectName: string,
+  onProgress?: (progress: string) => void
+): Promise<ExecutionResults | null> {
+  console.log('\n⚡════════════════════════════════════════════════');
+  console.log('⚡ DELEGATING TO LIGHTNING EXECUTION AGENT');
+  console.log('⚡════════════════════════════════════════════════');
+  
+  const startTime = Date.now();
+  
+  try {
+    // Determine which sponsors are worth validating
+    const detectedSponsors: string[] = [];
+    for (const [sponsor, analysis] of Object.entries(staticAnalysis.sponsors)) {
+      if (analysis.detected && analysis.integrationScore >= 5) {
+        detectedSponsors.push(sponsor);
+      }
+    }
+    
+    if (detectedSponsors.length === 0) {
+      console.log('⚡ No sponsors worth validating, skipping execution');
+      return null;
+    }
+    
+    console.log(`⚡ Sponsors to validate: ${detectedSponsors.join(', ')}`);
+    onProgress?.(`Testing ${detectedSponsors.length} sponsor integrations in cloud...`);
+    
+    // Get the execution agent and run
+    const executionAgent = getLightningExecutionAgent();
+    
+    const executionResults = await executionAgent.executeAnalysis({
+      repoPath,
+      language: staticAnalysis.repositoryStats.mainLanguage,
+      sponsors: detectedSponsors,
+      projectName
+    });
+    
+    const duration = Date.now() - startTime;
+    console.log(`⚡ Lightning execution completed in ${duration}ms`);
+    
+    return executionResults;
+    
+  } catch (error) {
+    console.error('⚡ Lightning execution failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Synthesize execution results into the analysis
+ */
+function synthesizeExecutionResults(
+  staticAnalysis: AnalysisResult,
+  executionResults: ExecutionResults | null
+): AnalysisResult {
+  if (!executionResults || !executionResults.tested) {
+    return staticAnalysis;
+  }
+  
+  console.log('\n⚡ Synthesizing execution results into analysis...');
+  
+  // Add execution summary
+  staticAnalysis.executionSummary = {
+    enabled: true,
+    success: true,
+    cloudPlatform: 'Lightning AI',
+    duration: 0 // Could calculate from executionResults
+  };
+  
+  // For each detected sponsor, add execution results
+  for (const [sponsorName, analysis] of Object.entries(staticAnalysis.sponsors)) {
+    if (analysis.detected) {
+      // Add execution results to sponsor analysis
+      analysis.executionResults = executionResults;
+      
+      // Adjust score based on execution
+      if (executionResults.appStarted && executionResults.endpointsTested) {
+        const successfulTests = executionResults.endpointsTested.filter(t => t.success);
+        const successRate = successfulTests.length / executionResults.endpointsTested.length;
+        
+        if (successRate >= 0.8) {
+          // Boost score if execution validated the integration
+          const originalScore = analysis.integrationScore;
+          analysis.integrationScore = Math.min(10, originalScore + 1);
+          console.log(`  ⚡ ${sponsorName}: ${originalScore} → ${analysis.integrationScore} (execution verified)`);
+        } else if (successRate < 0.5) {
+          // Lower score if execution showed issues
+          const originalScore = analysis.integrationScore;
+          analysis.integrationScore = Math.max(0, originalScore - 2);
+          console.log(`  ⚡ ${sponsorName}: ${originalScore} → ${analysis.integrationScore} (execution issues)`);
+        }
+      }
+      
+      // Update confidence based on execution
+      if (executionResults.appStarted) {
+        analysis.confidence = Math.min(1.0, analysis.confidence + 0.1);
+      }
+      
+      // Enhance technical summary with execution info
+      if (executionResults.verificationNotes) {
+        analysis.technicalSummary += `\n\nExecution Verification: ${executionResults.verificationNotes}`;
+      }
+    }
+  }
+  
+  console.log('⚡ Synthesis complete!');
+  
+  return staticAnalysis;
+}
+
 

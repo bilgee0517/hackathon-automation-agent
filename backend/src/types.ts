@@ -26,6 +26,39 @@ export interface RepositoryStats {
   dependencies: string[];
 }
 
+export interface EndpointTestResult {
+  endpoint: string;
+  method: string;
+  status: number;
+  responseTime: number;
+  success: boolean;
+  error?: string;
+  body?: string;
+}
+
+export interface ExecutionResults {
+  tested: boolean;
+  cloudEnvironment?: string;
+  studioId?: string;
+  installSuccess?: boolean;
+  installLogs?: string;
+  testsRun?: number;
+  testsPassed?: number;
+  testsFailed?: number;
+  testLogs?: string;
+  appStarted?: boolean;
+  appUrl?: string;
+  appLogs?: string;
+  endpointsTested?: EndpointTestResult[];
+  performanceMetrics?: {
+    avgResponseTime?: number;
+    memoryUsage?: number;
+    cpuUsage?: number;
+  };
+  screenshots?: string[];
+  verificationNotes?: string;
+}
+
 export interface SponsorAnalysis {
   detected: boolean;
   integrationScore: number; // 0-10
@@ -39,6 +72,7 @@ export interface SponsorAnalysis {
   prizeEligible: boolean;
   confidence: number; // 0-1
   suggestions: string[];
+  executionResults?: ExecutionResults; // NEW: Results from Lightning AI execution
 }
 
 export type SponsorName = 
@@ -68,6 +102,13 @@ export interface AnalysisResult {
   sponsors: Record<SponsorName, SponsorAnalysis>;
   overallSummary: string;
   innovativeAspects: string[];
+  executionSummary?: {
+    enabled: boolean;
+    success: boolean;
+    cloudPlatform?: string;
+    duration?: number;
+    error?: string;
+  };
 }
 
 export interface QueueJob {
