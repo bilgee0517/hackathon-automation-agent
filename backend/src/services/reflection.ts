@@ -1,6 +1,4 @@
 // Agent Reflection System - Self-improvement after each analysis
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
 import { AnalysisResult } from '../types';
 import { getAnthropicClient, getOpenAIClient, getAvailableProvider } from '../agent/provider';
 import { memorySystem, AgentMemory, SponsorPattern } from './memory';
@@ -170,7 +168,7 @@ async function runAnthropicReflection(prompt: string): Promise<string> {
   const client = getAnthropicClient();
   
   const response = await client.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-3-5-haiku-20241022', // Latest Haiku model
     max_tokens: 4000,
     messages: [{
       role: 'user',
@@ -296,8 +294,8 @@ async function storeReflectionLearnings(
         envVars: [],
         keywords: [],
         confidence: reflection.confidence[sponsor] || 0.5,
-        successCount: analysis.sponsors?.[sponsor]?.detected ? 1 : 0,
-        failureCount: analysis.sponsors?.[sponsor]?.detected ? 0 : 1,
+        successCount: (analysis.sponsors && (analysis.sponsors as any)[sponsor]?.detected) ? 1 : 0,
+        failureCount: (analysis.sponsors && (analysis.sponsors as any)[sponsor]?.detected) ? 0 : 1,
         lastUpdated: new Date().toISOString()
       };
     }
@@ -321,7 +319,6 @@ async function storeReflectionLearnings(
           
           // Extract patterns from evidence
           const files = data.evidence.files || [];
-          const snippets = data.evidence.codeSnippets || [];
           
           // Package files
           const packageFiles = files.filter(f => 

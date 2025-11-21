@@ -139,6 +139,7 @@ export async function runOpenAIAnalysis(
         for (const toolCall of toolCalls) {
           if (toolCall.type === 'function') {
             toolIndex++;
+            totalToolCalls++;
             const toolName = toolCall.function.name;
             
             console.log(`\n  ┌─ Tool ${toolIndex}: ${toolName}`);
@@ -198,9 +199,26 @@ export async function runOpenAIAnalysis(
         
         const result = validateAnalysisResult(completeAnalysis);
         
+        const analysisTime = Date.now() - analysisStartTime;
         console.log('✓ Analysis complete');
-        onProgress?.('Analysis complete!');
+        console.log(`  - Time taken: ${analysisTime}ms`);
+        console.log(`  - Tool calls: ${totalToolCalls}`);
+        console.log(`  - Iterations: ${iterationCount}`);
+        onProgress?.('Analysis complete! Running reflection...');
         
+        // Run reflection loop to learn from this analysis
+        try {
+          await runReflectionLoop(result, {
+            repoPath,
+            toolCallsUsed: totalToolCalls,
+            iterationCount,
+            timeMs: analysisTime
+          });
+        } catch (reflectionError) {
+          console.error('Reflection failed (continuing anyway):', reflectionError);
+        }
+        
+        onProgress?.('Done!');
         return result;
         
       } else {

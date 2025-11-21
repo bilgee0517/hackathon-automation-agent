@@ -1,6 +1,5 @@
 // Agent Memory System - Store and retrieve learnings from past analyses
-import { createClient } from 'redis';
-import type { RedisClientType } from 'redis';
+import type Redis from 'ioredis';
 
 export interface SponsorPattern {
   packages: string[];
@@ -69,7 +68,7 @@ export interface LearningsSummary {
 }
 
 class AgentMemorySystem {
-  private client: RedisClientType | null = null;
+  private client: Redis | null = null;
   private connected: boolean = false;
 
   constructor() {
@@ -83,16 +82,16 @@ class AgentMemorySystem {
     if (this.connected && this.client) return;
 
     try {
-      this.client = createClient({
-        url: process.env.REDIS_URL || 'redis://localhost:6379'
-      });
+      const Redis = require('ioredis');
+      this.client = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
-      this.client.on('error', (err) => {
-        console.error('Redis Memory Client Error:', err);
-        this.connected = false;
-      });
+      if (this.client) {
+        this.client.on('error', (err: Error) => {
+          console.error('Redis Memory Client Error:', err);
+          this.connected = false;
+        });
+      }
 
-      await this.client.connect();
       this.connected = true;
       console.log('✓ Agent Memory System connected to Redis');
     } catch (error) {
@@ -114,10 +113,7 @@ class AgentMemorySystem {
       await this.client.set(key, JSON.stringify(memory));
       
       // Add to sorted set for chronological retrieval
-      await this.client.zAdd('agent:memories:timeline', {
-        score: Date.now(),
-        value: memory.id
-      });
+      await this.client.zadd('agent:memories:timeline', Date.now(), memory.id);
       
       // Update aggregate patterns
       await this.updateAggregatePatterns(memory);
@@ -202,7 +198,7 @@ class AgentMemorySystem {
 
     try {
       // Get most recent memory IDs
-      const memoryIds = await this.client.zRange('agent:memories:timeline', -count, -1);
+      const memoryIds = await this.client.zrange('agent:memories:timeline', -count, -1);
       
       const memories: AgentMemory[] = [];
       for (const id of memoryIds) {
@@ -255,7 +251,7 @@ class AgentMemorySystem {
    */
   async updatePatternConfidence(
     sponsor: string,
-    pattern: string,
+    _pattern: string,
     success: boolean
   ): Promise<void> {
     await this.ensureConnected();
@@ -313,11 +309,11 @@ class AgentMemorySystem {
       
       const allPatterns = await this.getAllPatterns();
       const topPatterns = Object.entries(allPatterns)
-        .flatMap(([sponsor, pattern]) => 
-          pattern.packages.map(pkg => ({
+        .flatMap(([sponsor, sponsorPattern]) => 
+          sponsorPattern.packages.map(pkg => ({
             sponsor,
             pattern: pkg,
-            confidence: pattern.confidence
+            confidence: sponsorPattern.confidence
           }))
         )
         .sort((a, b) => b.confidence - a.confidence)

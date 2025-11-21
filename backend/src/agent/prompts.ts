@@ -2,7 +2,7 @@
 
 import { ALL_SPONSORS } from '../sponsors/detectors';
 import { isParallelConfigured } from '../services/parallel';
-import { memorySystem, type AgentMemory } from '../services/memory';
+import { memorySystem } from '../services/memory';
 
 export async function getAnalysisSystemPrompt(): Promise<string> {
   const sponsorList = ALL_SPONSORS.join(', ');
@@ -203,6 +203,11 @@ Return a JSON object with this EXACT structure:
 - Be fair and consistent in your scoring
 - Use your knowledge of these technologies to find creative integrations
 
+## CRITICAL: Final Response Format
+When you're done analyzing, respond with ONLY the JSON object. No explanations before or after.
+Start your final response with { and end with }
+The JSON must be valid and parseable.
+
 Now analyze the repository systematically and return your complete analysis as JSON.`;
 
   return prompt;
@@ -213,7 +218,7 @@ export async function getInitialAnalysisPrompt(repoPath: string, teamName: strin
   const sponsorList = ALL_SPONSORS.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ');
   const summary = await memorySystem.getLearningsSummary();
   
-  let prompt = `Analyze the hackathon project repository for team "${teamName}".
+  return `Analyze the hackathon project repository for team "${teamName}".
 
 Project: ${projectName}
 Repository path: ${repoPath}

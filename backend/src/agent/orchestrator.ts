@@ -92,7 +92,7 @@ async function runClaudeAnalysis(
       
       const requestStart = Date.now();
       const response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-haiku-20241022', // Latest Haiku model - faster and cheaper
         max_tokens: 8000,
         system: systemPrompt,
         tools: tools as any,
@@ -180,6 +180,26 @@ async function runClaudeAnalysis(
         console.log(`\nLast 500 chars:\n${responseText.substring(Math.max(0, responseText.length - 500))}`);
         console.log('═'.repeat(80));
         onProgress?.('Parsing analysis results...');
+        
+        // Check if response contains JSON
+        if (!responseText.includes('{') || !responseText.includes('}')) {
+          console.warn('⚠️  Response does not contain JSON. Asking agent to provide JSON...');
+          
+          // Add assistant's response
+          messages.push({
+            role: 'assistant',
+            content: response.content
+          });
+          
+          // Ask for JSON explicitly
+          messages.push({
+            role: 'user',
+            content: 'Please provide your complete analysis in the JSON format specified in the system prompt. Start with { and end with }. Include all sponsors with their scores and evidence.'
+          });
+          
+          continueLoop = true; // Continue to get JSON
+          continue;
+        }
         
         // Extract JSON from response
         const analysis = parseAnalysisFromResponse(responseText);
