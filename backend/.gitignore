@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.log
+tmp/
+repos/
+*.zip
+.DS_Store
+coverage/
+
+# Ensure tmp directory stays in backend folder
+../tmp/
+/tmp/
+
