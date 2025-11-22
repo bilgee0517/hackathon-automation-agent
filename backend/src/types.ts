@@ -5,8 +5,15 @@ export interface AnalysisRequest {
   teamName: string;
   projectName: string;
   branch?: string;
-  teamMembers?: string[];
+  teamMembers?: TeamMember[];
   hackathonId?: string;
+}
+
+export interface TeamMember {
+  name: string;
+  email?: string;
+  githubUsername?: string;
+  bio?: string;
 }
 
 export interface JobStatus {
@@ -40,6 +47,7 @@ export interface ExecutionResults {
   tested: boolean;
   cloudEnvironment?: string;
   studioId?: string;
+  durationMs?: number;
   installSuccess?: boolean;
   installLogs?: string;
   testsRun?: number;
@@ -76,6 +84,25 @@ export interface SponsorAnalysis {
 }
 
 export type SponsorName = 
+  // NEW SPONSORS
+  | 'liquidMetalAI'
+  | 'fastinoLabs'
+  | 'freepik'
+  | 'gladly'
+  | 'frontegg'
+  | 'googleDeepMind'
+  | 'forethought'
+  | 'lovable'
+  | 'airia'
+  | 'campfire'
+  | 'linkup'
+  | 'daft'
+  | 'senso'
+  | 'crosby'
+  | 'mcpTotal';
+  
+  // OLD SPONSORS (COMMENTED OUT)
+  /*
   | 'aws'
   | 'skyflow'
   | 'postman'
@@ -91,6 +118,7 @@ export type SponsorName =
   | 'lightningAI'
   | 'parallel'
   | 'cleric';
+  */
 
 export interface AnalysisResult {
   teamId: string;
@@ -117,7 +145,7 @@ export interface QueueJob {
   teamName: string;
   projectName: string;
   branch?: string;
-  teamMembers?: string[];
+  teamMembers?: TeamMember[];
   hackathonId?: string;
 }
 

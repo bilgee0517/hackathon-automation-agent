@@ -9,6 +9,7 @@ import { runOpenAIAnalysis } from './openai-orchestrator';
 import { runReflectionLoop } from '../services/reflection';
 import { getLightningExecutionAgent } from './lightning-executor';
 import { isLightningExecutionEnabled } from '../services/lightning';
+import { emitAgentEvent } from '../api/dashboard';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -23,7 +24,8 @@ export async function runAgentAnalysis(
   teamName: string,
   projectName: string,
   githubUrl: string,
-  onProgress?: (progress: string) => void
+  onProgress?: (progress: string) => void,
+  jobId?: string
 ): Promise<AnalysisResult> {
   
   // Determine which AI provider to use
@@ -42,7 +44,7 @@ export async function runAgentAnalysis(
   }
   
   // Default to Anthropic (Claude)
-  return await runClaudeAnalysis(repoPath, teamName, projectName, githubUrl, onProgress);
+  return await runClaudeAnalysis(repoPath, teamName, projectName, githubUrl, onProgress, jobId);
 }
 
 /**
@@ -53,7 +55,8 @@ async function runClaudeAnalysis(
   teamName: string,
   projectName: string,
   githubUrl: string,
-  onProgress?: (progress: string) => void
+  onProgress?: (progress: string) => void,
+  jobId?: string
 ): Promise<AnalysisResult> {
   
   const analysisStartTime = Date.now();
@@ -81,6 +84,17 @@ async function runClaudeAnalysis(
   console.log('═══════════════════════════════════════════════════════\n');
   onProgress?.('Starting analysis with Claude...');
   
+  // Emit start event
+  if (jobId) {
+    emitAgentEvent({
+      jobId,
+      timestamp: Date.now(),
+      type: 'start',
+      agent: 'main',
+      data: { teamName, projectName, githubUrl }
+    });
+  }
+  
   while (continueLoop && iterationCount < maxIterations) {
     iterationCount++;
     
@@ -92,10 +106,35 @@ async function runClaudeAnalysis(
       console.log(`Requesting response from Claude...`);
       onProgress?.(`[Iteration ${iterationCount}] Requesting response from Claude...`);
       
+      // Emit iteration event
+      if (jobId) {
+        emitAgentEvent({
+          jobId,
+          timestamp: Date.now(),
+          type: 'iteration',
+          agent: 'main',
+          data: { iteration: iterationCount, messageCount: messages.length }
+        });
+        
+        // Emit API request event with details
+        emitAgentEvent({
+          jobId,
+          timestamp: Date.now(),
+          type: 'api_request',
+          agent: 'main',
+          data: { 
+            model: 'claude-sonnet-4-5-20250929',
+            max_tokens: 16000,
+            messageCount: messages.length,
+            toolsAvailable: tools.length
+          }
+        });
+      }
+      
       const requestStart = Date.now();
       const response = await client.messages.create({
-        model: 'claude-3-5-haiku-20241022', // Latest Haiku model - faster and cheaper
-        max_tokens: 8000,
+        model: 'claude-sonnet-4-5-20250929', // Claude Sonnet 4.5 - latest model with superior reasoning
+        max_tokens: 16000, // Increased for more comprehensive analysis
         system: systemPrompt,
         tools: tools as any,
         messages: messages as any
@@ -104,6 +143,22 @@ async function runClaudeAnalysis(
       
       console.log(`✓ Response received in ${requestTime}ms`);
       console.log(`Stop reason: ${response.stop_reason}`);
+      
+      // Emit API response event
+      if (jobId) {
+        emitAgentEvent({
+          jobId,
+          timestamp: Date.now(),
+          type: 'api_response',
+          agent: 'main',
+          data: { 
+            duration: requestTime,
+            stopReason: response.stop_reason,
+            contentBlocks: response.content.length,
+            usage: response.usage
+          }
+        });
+      }
       
       // Check if agent wants to use tools
       if (response.stop_reason === 'tool_use') {
@@ -130,6 +185,23 @@ async function runClaudeAnalysis(
             console.log(`  │ Input: ${JSON.stringify(block.input, null, 2).split('\n').map((line, i) => i === 0 ? line : '  │        ' + line).join('\n')}`);
             onProgress?.(`  → ${toolName}: ${JSON.stringify(block.input).substring(0, 50)}...`);
             
+            // Emit tool call event with full details
+            if (jobId) {
+              emitAgentEvent({
+                jobId,
+                timestamp: Date.now(),
+                type: 'tool_call',
+                agent: 'main',
+                data: { 
+                  tool: toolName, 
+                  input: block.input,
+                  inputFull: JSON.stringify(block.input, null, 2),
+                  toolIndex: toolIndex,
+                  totalTools: response.content.filter(b => b.type === 'tool_use').length
+                }
+              });
+            }
+            
             const toolStart = Date.now();
             const result = await executeToolCall(block.name, block.input, repoPath);
             const toolTime = Date.now() - toolStart;
@@ -141,6 +213,24 @@ async function runClaudeAnalysis(
             console.log(`  │ Result (${toolTime}ms, ${result.length} chars, ${resultLines.length} lines):`);
             console.log(`  │        ${resultPreview}${hasMore ? '\n  │        ... (' + (resultLines.length - 5) + ' more lines)' : ''}`);
             console.log(`  └─ Done`);
+            
+            // Emit tool result event with full result
+            if (jobId) {
+              emitAgentEvent({
+                jobId,
+                timestamp: Date.now(),
+                type: 'tool_result',
+                agent: 'main',
+                data: { 
+                  tool: toolName, 
+                  result: result.substring(0, 500), 
+                  resultFull: result, // Full result
+                  resultLength: result.length,
+                  resultLines: result.split('\n').length,
+                  duration: toolTime 
+                }
+              });
+            }
             
             toolResults.push({
               type: 'tool_result',
@@ -182,6 +272,20 @@ async function runClaudeAnalysis(
         console.log(`\nLast 500 chars:\n${responseText.substring(Math.max(0, responseText.length - 500))}`);
         console.log('═'.repeat(80));
         onProgress?.('Parsing analysis results...');
+        
+        // Emit parsing event
+        if (jobId) {
+          emitAgentEvent({
+            jobId,
+            timestamp: Date.now(),
+            type: 'parsing',
+            agent: 'main',
+            data: { 
+              responseLength: responseText.length,
+              responsePreview: responseText.substring(0, 200)
+            }
+          });
+        }
         
         // Check if response contains JSON
         if (!responseText.includes('{') || !responseText.includes('}')) {
@@ -232,9 +336,11 @@ async function runClaudeAnalysis(
           try {
             const executionResult = await runLightningExecution(
               repoPath,
+              githubUrl,
               result,
               projectName,
-              onProgress
+              onProgress,
+              jobId
             );
             
             // Synthesize execution results into analysis
@@ -265,7 +371,22 @@ async function runClaudeAnalysis(
           console.error('Reflection failed (continuing anyway):', reflectionError);
         }
         
+        const totalTime = Date.now() - analysisStartTime;
+        console.log(`✓ Analysis completed in ${totalTime}ms`);
+        
         onProgress?.('Done!');
+        
+        // Emit completion event
+        if (jobId) {
+          emitAgentEvent({
+            jobId,
+            timestamp: Date.now(),
+            type: 'complete',
+            agent: 'main',
+            data: { success: true, duration: analysisTime }
+          });
+        }
+        
         return result;
         
       } else {
@@ -441,9 +562,10 @@ function createEmptySponsorAnalysis() {
  */
 export function validateAnalysisResult(result: Partial<AnalysisResult>): AnalysisResult {
   const allSponsors: SponsorName[] = [
-    'aws', 'skyflow', 'postman', 'redis', 'forethought', 'finsterAI',
-    'senso', 'anthropic', 'sanity', 'trmLabs', 'coder', 'lightpanda',
-    'lightningAI', 'parallel', 'cleric'
+    'liquidMetalAI', 'fastinoLabs', 'freepik', 'gladly', 'frontegg', 'googleDeepMind',
+    'forethought', 'lovable', 'airia', 'campfire', 'linkup', 'daft',
+    'senso', 'crosby', 'mcpTotal'
+    // OLD: 'aws', 'skyflow', 'postman', 'redis', 'anthropic', 'sanity', 'trmLabs', 'coder', 'lightpanda', 'lightningAI', 'parallel', 'cleric'
   ];
   
   // Ensure all sponsors are present
@@ -485,9 +607,11 @@ export function validateAnalysisResult(result: Partial<AnalysisResult>): Analysi
  */
 async function runLightningExecution(
   repoPath: string,
+  githubUrl: string,
   staticAnalysis: AnalysisResult,
   projectName: string,
-  onProgress?: (progress: string) => void
+  onProgress?: (progress: string) => void,
+  jobId?: string
 ): Promise<ExecutionResults | null> {
   console.log('\n⚡════════════════════════════════════════════════');
   console.log('⚡ DELEGATING TO LIGHTNING EXECUTION AGENT');
@@ -517,9 +641,11 @@ async function runLightningExecution(
     
     const executionResults = await executionAgent.executeAnalysis({
       repoPath,
+      githubUrl,
       language: staticAnalysis.repositoryStats.mainLanguage,
       sponsors: detectedSponsors,
-      projectName
+      projectName,
+      jobId // Pass jobId for logging
     });
     
     const duration = Date.now() - startTime;

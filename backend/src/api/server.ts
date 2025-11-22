@@ -4,6 +4,7 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './routes';
+import dashboardRoutes from './dashboard';
 import { initializeQueueProcessor } from './processor';
 import { getRedisClient, getAnalysisQueue } from '../services/redis';
 
@@ -25,6 +26,7 @@ app.use((req, _res, next) => {
 
 // Routes
 app.use('/api', routes);
+app.use('/api', dashboardRoutes); // Agent Observatory
 
 // Root endpoint
 app.get('/', (_req, res) => {

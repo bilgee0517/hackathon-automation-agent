@@ -57,9 +57,9 @@ export async function runReflectionLoop(
     await storeReflectionLearnings(analysis, reflection, metadata);
     
     console.log('✓ Reflection complete');
-    console.log(`  - Average confidence: ${reflection.performanceMetrics.confidence.toFixed(2)}`);
-    console.log(`  - New patterns discovered: ${Object.keys(reflection.newPatterns).length}`);
-    console.log(`  - Improvement suggestions: ${reflection.improvements.length}`);
+    console.log(`  - Average confidence: ${reflection.performanceMetrics?.confidence?.toFixed(2) || '0.50'}`);
+    console.log(`  - New patterns discovered: ${reflection.newPatterns ? Object.keys(reflection.newPatterns).length : 0}`);
+    console.log(`  - Improvement suggestions: ${reflection.improvements?.length || 0}`);
     console.log('═══════════════════════════════════════════════════════\n');
     
     return reflection;
@@ -287,17 +287,22 @@ async function storeReflectionLearnings(
     // Build sponsor patterns from new discoveries
     const sponsorPatterns: Record<string, SponsorPattern> = {};
     
-    for (const [sponsor, patterns] of Object.entries(reflection.newPatterns)) {
-      sponsorPatterns[sponsor] = {
-        packages: patterns.filter(p => !p.includes('(') && !p.includes('.')), // Package names
-        apis: patterns.filter(p => p.includes('.') || p.includes('()')), // API methods
-        envVars: [],
-        keywords: [],
-        confidence: reflection.confidence[sponsor] || 0.5,
-        successCount: (analysis.sponsors && (analysis.sponsors as any)[sponsor]?.detected) ? 1 : 0,
-        failureCount: (analysis.sponsors && (analysis.sponsors as any)[sponsor]?.detected) ? 0 : 1,
-        lastUpdated: new Date().toISOString()
-      };
+    // Safety check: ensure newPatterns exists
+    if (reflection.newPatterns && typeof reflection.newPatterns === 'object') {
+      for (const [sponsor, patterns] of Object.entries(reflection.newPatterns)) {
+        if (Array.isArray(patterns)) {
+          sponsorPatterns[sponsor] = {
+            packages: patterns.filter(p => !p.includes('(') && !p.includes('.')), // Package names
+            apis: patterns.filter(p => p.includes('.') || p.includes('()')), // API methods
+            envVars: [],
+            keywords: [],
+            confidence: reflection.confidence?.[sponsor] || 0.5,
+            successCount: (analysis.sponsors && (analysis.sponsors as any)[sponsor]?.detected) ? 1 : 0,
+            failureCount: (analysis.sponsors && (analysis.sponsors as any)[sponsor]?.detected) ? 0 : 1,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      }
     }
     
     // Also extract patterns from detected sponsors
@@ -343,24 +348,24 @@ async function storeReflectionLearnings(
       analysisId: analysis.teamId || uuidv4(),
       learnings: {
         sponsorPatterns,
-        detectionStrategies: reflection.effectiveStrategies.map(s => ({
+        detectionStrategies: (reflection.effectiveStrategies || []).map(s => ({
           name: s,
           description: s,
           successRate: 0.5,
           totalUses: 1,
           successfulUses: 1,
-          averageTimeMs: metadata.timeMs,
-          exampleRepos: [metadata.repoPath]
+          averageTimeMs: metadata.timeMs || 0,
+          exampleRepos: [metadata.repoPath || 'unknown']
         })),
         commonMistakes: [],
-        newDiscoveries: Object.values(reflection.newPatterns).flat()
+        newDiscoveries: reflection.newPatterns ? Object.values(reflection.newPatterns).flat() : []
       },
       performance: {
-        accuracy: reflection.performanceMetrics.accuracy,
-        confidence: reflection.performanceMetrics.confidence,
-        toolCallsUsed: metadata.toolCallsUsed,
-        iterationCount: metadata.iterationCount,
-        timeMs: metadata.timeMs,
+        accuracy: reflection.performanceMetrics?.accuracy || 0.5,
+        confidence: reflection.performanceMetrics?.confidence || 0.5,
+        toolCallsUsed: metadata.toolCallsUsed || 0,
+        iterationCount: metadata.iterationCount || 0,
+        timeMs: metadata.timeMs || 0,
         sponsorsDetected: Object.values(analysis.sponsors || {}).filter(s => s.detected).length,
         sponsorsMissed: Object.values(analysis.sponsors || {}).filter(s => !s.detected).length
       }

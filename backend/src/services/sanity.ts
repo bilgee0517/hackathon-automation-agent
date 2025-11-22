@@ -1,7 +1,7 @@
 // Sanity client service for storing analysis results
 
 import { createClient, SanityClient } from '@sanity/client';
-import { AnalysisResult } from '../types';
+import { AnalysisResult, SponsorAnalysis, SponsorName } from '../types';
 
 let sanityClient: SanityClient | null = null;
 
@@ -30,13 +30,171 @@ export function getSanityClient(): SanityClient {
 }
 
 /**
- * Save analysis result to Sanity
+ * Convert sponsor name to readable format
  */
-export async function saveSponsorAnalysis(analysis: AnalysisResult): Promise<string> {
+function getSponsorDisplayName(sponsorKey: SponsorName): string {
+  const displayNames: Record<SponsorName, string> = {
+    liquidMetalAI: 'LiquidMetal AI',
+    fastinoLabs: 'Fastino Labs',
+    freepik: 'Freepik',
+    gladly: 'Gladly',
+    frontegg: 'Frontegg',
+    googleDeepMind: 'Google DeepMind',
+    forethought: 'Forethought',
+    lovable: 'Lovable',
+    airia: 'Airia',
+    campfire: 'Campfire',
+    linkup: 'Linkup',
+    daft: 'Daft',
+    senso: 'Senso',
+    crosby: 'Crosby',
+    mcpTotal: 'MCP Total'
+    // OLD SPONSORS (COMMENTED OUT)
+    // anthropic: 'Anthropic',
+    // aws: 'AWS',
+    // redis: 'Redis',
+    // sanity: 'Sanity',
+    // postman: 'Postman',
+    // skyflow: 'Skyflow',
+    // finsterAI: 'Finster AI',
+    // trmLabs: 'TRM Labs',
+    // coder: 'Coder',
+    // lightpanda: 'Lightpanda',
+    // lightningAI: 'Lightning AI',
+    // parallel: 'Parallel',
+    // cleric: 'Cleric'
+  };
+  return displayNames[sponsorKey] || sponsorKey;
+}
+
+/**
+ * Convert sponsor analysis to detailed integration format
+ */
+function convertToSponsorIntegration(sponsorKey: SponsorName, analysis: SponsorAnalysis) {
+  if (!analysis.detected) {
+    return null;
+  }
+
+  return {
+    _type: 'sponsorIntegration',
+    sponsorSlug: sponsorKey,
+    sponsorName: getSponsorDisplayName(sponsorKey),
+    aiSummary: analysis.technicalSummary,
+    integrationDepth: analysis.integrationScore >= 8 ? 'core' :
+                      analysis.integrationScore >= 6 ? 'significant' :
+                      analysis.integrationScore >= 4 ? 'supporting' : 'minimal',
+    toolsUsed: analysis.evidence.keyFindings.slice(0, 5), // Top 5 findings as tools
+    technicalScore: analysis.integrationScore,
+    creativityScore: Math.round(analysis.integrationScore * 0.9), // Slightly lower for creativity
+    codeEvidence: analysis.evidence.files.map((file, idx) => 
+      `${file}: ${analysis.evidence.keyFindings[idx] || 'Integration detected'}`
+    ).slice(0, 5),
+    userFacingFeatures: analysis.plainEnglishSummary
+      .split('.')
+      .filter(s => s.trim().length > 10)
+      .slice(0, 5)
+  };
+}
+
+/**
+ * Generate a slug from project name
+ */
+function generateSlug(projectName: string): string {
+  return projectName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Save analysis result to Sanity in the project format (matching mock data)
+ */
+export async function saveSponsorAnalysis(
+  analysis: AnalysisResult, 
+  teamMembers?: Array<{name: string; email?: string; githubUsername?: string; bio?: string}>
+): Promise<string> {
   const client = getSanityClient();
   
   try {
-    const doc = {
+    console.log('\n📝 Creating project in Sanity...');
+    
+    // Step 1: Create team members (hackers) if provided
+    const teamMemberRefs: Array<{_type: string; _ref: string}> = [];
+    if (teamMembers && teamMembers.length > 0) {
+      console.log(`Creating ${teamMembers.length} team members...`);
+      for (const member of teamMembers) {
+        try {
+          const hackerDoc = await client.create({
+            _type: 'hacker',
+            name: member.name,
+            email: member.email,
+            githubUsername: member.githubUsername,
+            bio: member.bio
+          });
+          console.log(`  ✅ Created: ${member.name} (ID: ${hackerDoc._id})`);
+          teamMemberRefs.push({
+            _type: 'reference',
+            _ref: hackerDoc._id
+          });
+        } catch (error) {
+          console.warn(`  ⚠️  Failed to create team member ${member.name}:`, error);
+        }
+      }
+    }
+    
+    // Step 2: Convert sponsor analyses to integrations
+    const sponsorIntegrations = Object.entries(analysis.sponsors)
+      .map(([key, data]) => convertToSponsorIntegration(key as SponsorName, data))
+      .filter(Boolean);
+
+    // Step 3: Create project document (matching mock data structure)
+    const projectData: any = {
+      _type: 'project',
+      projectName: analysis.projectName,
+      slug: {
+        _type: 'slug',
+        current: generateSlug(analysis.projectName)
+      },
+      tagline: analysis.overallSummary.split('.')[0] || 'Hackathon project',
+      description: analysis.overallSummary,
+      githubUrl: analysis.githubUrl,
+      githubData: {
+        stars: 0,
+        forks: 0,
+        language: analysis.repositoryStats.mainLanguage,
+        lastCommit: new Date().toISOString()
+      },
+      analysisData: {
+        aiSummaryForJudges: analysis.overallSummary,
+        latestAnalysisAt: analysis.analyzedAt,
+        tags: [
+          ...analysis.innovativeAspects.slice(0, 3),
+          analysis.repositoryStats.mainLanguage.toLowerCase(),
+          ...Object.keys(analysis.sponsors)
+            .filter(k => analysis.sponsors[k as SponsorName].detected)
+            .slice(0, 5)
+        ].filter((v, i, a) => a.indexOf(v) === i) // unique tags
+      },
+      sponsorIntegrations,
+      submittedAt: analysis.analyzedAt,
+      status: 'analyzed'
+    };
+    
+    // Add team references if any were created
+    if (teamMemberRefs.length > 0) {
+      projectData.team = teamMemberRefs;
+    }
+    
+    const result = await client.create(projectData);
+    console.log(`✓ Created project in Sanity: ${result.projectName} (ID: ${result._id})`);
+    console.log(`  Status: ${result.status}`);
+    console.log(`  Sponsor integrations: ${sponsorIntegrations.length}`);
+    if (teamMemberRefs.length > 0) {
+      console.log(`  Team members: ${teamMemberRefs.length}`);
+    }
+    
+    // Also save to legacy team format for backward compatibility
+    const teamDoc = {
       _type: 'team',
       teamName: analysis.teamName,
       projectName: analysis.projectName,
@@ -48,8 +206,8 @@ export async function saveSponsorAnalysis(analysis: AnalysisResult): Promise<str
       innovativeAspects: analysis.innovativeAspects || []
     };
     
-    const result = await client.create(doc);
-    console.log(`✓ Saved analysis to Sanity: ${result._id}`);
+    const teamResult = await client.create(teamDoc);
+    console.log(`✓ Created team document for compatibility: ${teamResult._id}`);
     
     return result._id;
   } catch (error) {
