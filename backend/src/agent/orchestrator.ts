@@ -123,7 +123,7 @@ async function runClaudeAnalysis(
           type: 'api_request',
           agent: 'main',
           data: { 
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 16000,
             messageCount: messages.length,
             toolsAvailable: tools.length
@@ -133,7 +133,7 @@ async function runClaudeAnalysis(
       
       const requestStart = Date.now();
       const response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022', // Sonnet 3.5 - superior reasoning and judgment
+        model: 'claude-sonnet-4-5-20250929', // Claude Sonnet 4.5 - latest model with superior reasoning
         max_tokens: 16000, // Increased for more comprehensive analysis
         system: systemPrompt,
         tools: tools as any,

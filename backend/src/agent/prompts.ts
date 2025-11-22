@@ -325,6 +325,16 @@ When you're done analyzing, respond with ONLY the JSON object. No explanations b
 Start your final response with { and end with }
 The JSON must be valid and parseable.
 
+**QUALITY CHECKLIST before submitting:**
+- [ ] Each detected sponsor has 3-5 paragraph technicalSummary with specific API/method names
+- [ ] Each detected sponsor has 2-3 paragraph plainEnglishSummary
+- [ ] Each detected sponsor has 5-10+ substantial code snippets (5-20 lines each, with file paths)
+- [ ] Each detected sponsor has 5-10+ specific, detailed keyFindings
+- [ ] overallSummary is 4-6 comprehensive paragraphs
+- [ ] All code snippets include file paths and show real implementation (not just imports)
+- [ ] Technical summaries name specific functions/methods/endpoints, not generic descriptions
+- [ ] Evidence shows HOW the technology is used, not just WHERE it appears
+
 Now analyze the repository systematically and return your complete analysis as JSON.`;
 
   return prompt;
