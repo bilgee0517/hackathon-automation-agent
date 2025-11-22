@@ -7,7 +7,10 @@ import os
 import sys
 
 # Set credentials
-os.environ['LIGHTNING_API_KEY'] = '678e664e-706d-4efc-9af5-7da8f54a5dde'
+os.environ['LIGHTNING_API_KEY'] = os.getenv('LIGHTNING_API_KEY', '')
+if not os.environ['LIGHTNING_API_KEY']:
+    print("Error: LIGHTNING_API_KEY environment variable not set")
+    sys.exit(1)
 
 from lightning_sdk import Studio, Machine
 
